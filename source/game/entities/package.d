@@ -1,0 +1,2 @@
+module game.entities;
+
