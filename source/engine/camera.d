@@ -24,7 +24,7 @@ class Camera {
     mat4 getMatrix() {
         vec2i viewport = fcViewport();
         return 
-            mat4.perspective(viewport.x, viewport.y, 90, 0.1, 1000) *
+            mat4.perspective(viewport.x, viewport.y, 90, 0.1, 500) *
             this.getRotationMatrix() * 
             mat4.translation(position);
     }

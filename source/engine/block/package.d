@@ -1,5 +1,6 @@
 module engine.block;
 public import engine.render.atlas;
+public import engine.block.blocksel;
 import engine;
 
 /**

@@ -8,11 +8,37 @@ import std.stdio : writeln;
     The player
 */
 class PlayerEntity : Entity {
+private:
     KeyboardState* lstate;
     KeyboardState* kstate;
 
     BlockRef placeId = 0;
+    WorldPos* lookingAt;
+    WorldPos* lastLookingAt;
 
+
+    void updateBlockLookAt() {
+        vec3 forwardVector = vec4(0, 0, 0.8, 1) * FcCamera.getRotationMatrix();
+        vec3 ray = FcCamera.position;
+        vec3 lastRay;
+        foreach(i; 0..12) {
+            lastRay = ray;
+            ray += forwardVector;
+            auto rayBlock = WorldPos(vec3i(-cast(int)floor(ray.x), cast(int)floor(abs(ray.y)), -cast(int)floor(ray.z)));
+            auto lastRayBlock = WorldPos(vec3i(-cast(int)floor(lastRay.x), cast(int)floor(abs(lastRay.y)), -cast(int)floor(lastRay.z)));
+        
+            Chunk chunk = world.getChunkAtWorldPos(rayBlock);
+            if (chunk !is null && chunk.hasBlockAt(rayBlock)) {
+                lookingAt = new WorldPos(rayBlock.x, rayBlock.y, rayBlock.z);
+                lastLookingAt = new WorldPos(lastRayBlock.x, lastRayBlock.y, lastRayBlock.z);
+                return;
+            }
+        }
+        lookingAt = null;
+        lastLookingAt = null;
+    }
+
+public:
     /**
         Constructs the player
     */
@@ -46,32 +72,17 @@ class PlayerEntity : Entity {
 
         FcCamera.position = vec3(position.x, position.y - 1, position.z);
 
+        this.updateBlockLookAt();
+        if (lookingAt) fcDrawBlockSelection(*lookingAt);
+
         if (lstate !is null) {
 
-            if (kstate.isKeyDown(Keys.E) && lstate.isKeyUp(Keys.E)) {
-                vec3 forwardVector = vec4(0, 0, 0.8, 1) * FcCamera.getRotationMatrix();
-                vec3 ray = FcCamera.position;
-                vec3 lastRay;
-                foreach(i; 0..8) {
-                    lastRay = ray;
-                    ray += forwardVector;
-                    auto rayBlock = WorldPos(vec3i(cast(int)floor(ray.x), cast(int)floor(abs(ray.y)), cast(int)floor(ray.z)));
-                    auto lastRayBlock = WorldPos(vec3i(cast(int)floor(lastRay.x), cast(int)floor(abs(lastRay.y)), cast(int)floor(lastRay.z)));
-                    writeln(rayBlock);
-
-                    Chunk chunk = world.getChunkAt(rayBlock);
-                    if (chunk !is null) {
-                        if (chunk.hasBlockAt(rayBlock)) {
-                            if (placeId == 0) {
-                                chunk.setBlockAt(rayBlock, 0);
-                            } else {
-                                chunk.setBlockAt(lastRayBlock, placeId);
-                            }
-                            return;
-                        }
-                    }
+            if (lookingAt && kstate.isKeyDown(Keys.E) && lstate.isKeyUp(Keys.E)) {
+                if (placeId == 0) {
+                    TheWorld.setBlockAt(*lookingAt, 0);
+                } else {
+                    TheWorld.setBlockAt(*lastLookingAt, placeId);
                 }
-                writeln("Hit nothing");
             }
 
             if (kstate.isKeyDown(Keys.One) && lstate.isKeyUp(Keys.One)) {

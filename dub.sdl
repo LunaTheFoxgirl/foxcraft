@@ -12,6 +12,6 @@ dependency "open-simplex-2" version="~>1.0.1"
 targetPath "out/"
 copyFiles "libs/*.txt"
 copyFiles "libs/*.dll" platform="windows"
-versions "GL_41" "SDL_204"
+versions "GL_41" "SDL_204" "GL_KHR_debug"
 
 stringImportPaths "res/"

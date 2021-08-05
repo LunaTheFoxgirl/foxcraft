@@ -73,13 +73,29 @@ public:
     */
     void upload() {
         if (data is null) return;
+        auto idata = atomicLoad(data);
 
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, CMData.sizeof*data.vertices.length, data.vertices.ptr, GL_DYNAMIC_DRAW);
+        // No need to upload empty buffers.
+        if (idata.vertices.length == 0) return;
+
+        glBindVertexArray(chunkVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, this.vbo);
+        glBufferData(GL_ARRAY_BUFFER, CMData.sizeof*idata.vertices.length, idata.vertices.ptr, GL_DYNAMIC_DRAW);
     }
 
     size_t length() {
-        return data !is null ? data.vertices.length : 0;
+        auto idata = atomicLoad(data);
+        return idata !is null ? idata.vertices.length : 0;
+    }
+
+    override
+    string toString() {
+        import std.format : format;
+        string mstr = "";
+        foreach(CMData data; data.vertices) {
+            mstr ~= "v %f %f %f\n".format(data.vertex.x, data.vertex.y, data.vertex.z);
+        }
+        return mstr;
     }
 }
 
@@ -111,7 +127,6 @@ public:
         TODO: use a better meshing method
     */
     void regenerate() {
-        chunk.isReady = false;
         MeshGenerator.enqueue(new immutable(MeshGenTask)(
             cast(immutable(ChunkMesh))this, 
             cast(immutable(CMView))CMView(chunk)
@@ -122,11 +137,14 @@ public:
         Draws the chunk mesh
     */
     void draw() {
+        size_t len = buffer.length;
+        if (len == 0) return;
+
+        glBindVertexArray(chunkVAO);
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
-        glDisable(GL_CULL_FACE);
-        glBindVertexArray(chunkVAO);
+        glEnable(GL_CULL_FACE);
 
         blockShader.use();
         blockShader.setUniform(mvp, 
@@ -140,24 +158,21 @@ public:
 
         fcAtlasBind();
 
-        glBindBuffer(GL_ARRAY_BUFFER, buffer.vbo);
-
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);
         glEnableVertexAttribArray(2);
-        glEnableVertexAttribArray(3);
 
+        glBindBuffer(GL_ARRAY_BUFFER, buffer.vbo);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, CMData.sizeof, null);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, CMData.sizeof, cast(void*)CMData.uv.offsetof);
+        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, CMData.sizeof, cast(void*)CMData.light.offsetof);
         //glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, CMData.sizeof, cast(void*)CMData.vts.offsetof);
-        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, CMData.sizeof, cast(void*)CMData.light.offsetof);
 
-        glDrawArrays(GL_TRIANGLES, 0, cast(int)buffer.length);
+        glDrawArrays(GL_TRIANGLES, 0, cast(int)len);
 
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(2);
-        glDisableVertexAttribArray(3);
 
     }
 }

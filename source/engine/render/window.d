@@ -16,13 +16,33 @@ SDL_Window* fcGetWindowPtr() {
     return fcGameWindow;
 }
 
+extern(Windows) void debugMessage(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) nothrow {
+    (cast(void delegate() nothrow)() {
+        import std.stdio : writefln;
+        string severity;
+        switch(type) {
+            case GL_DEBUG_TYPE_ERROR: severity = "ERROR"; break;
+            case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: severity = "DEPRC"; break;
+            case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: severity = "UNDEF"; break;
+            case GL_DEBUG_TYPE_PORTABILITY: severity = "PORTA"; break;
+            case GL_DEBUG_TYPE_PERFORMANCE: severity = "PERFC"; break;
+            case GL_DEBUG_TYPE_MARKER: severity = "MARKR"; break;
+            case GL_DEBUG_TYPE_PUSH_GROUP: severity = "PSGRP"; break;
+            case GL_DEBUG_TYPE_POP_GROUP: severity = "PPGRP"; break;
+            default: severity = "OTHER";
+        }
+
+        //writefln("[%s]: %s", severity, cast(string)message.fromStringz);
+    })();
+}
+
 /**
     Creates a new game window
 */
 void fcGameWindowCreate(string title) {
     // TODO: load last window size from file
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    //SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -54,11 +74,16 @@ void fcGameWindowCreate(string title) {
 
     // Sets VSync On
     SDL_GL_SetSwapInterval(1);
-
     
 
     // Loads OpenGL functions
     fcLoadGL();
+
+    // glEnable(GL_DEBUG_OUTPUT);
+    // glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    // glDebugMessageCallback(&debugMessage, null);
+
+    // glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, null, GL_TRUE);
     
 }
 

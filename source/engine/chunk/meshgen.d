@@ -82,43 +82,45 @@ struct CMView {
             Chunk chf = chunk.chunkFront;
             Chunk chb = chunk.chunkBack;
 
-            this.blocks = &chunk.blocks;
-            if (chl) this.cl = &chl.blocks;
-            else if (!chl || !chl.isReady) hasLeft = false;
+            import core.atomic : atomicLoad;
 
-            if (chr) this.cr = &chr.blocks;
-            else if (!chr || !chr.isReady) hasRight = false;
+            this.mstore = chunk.store;
+            if (chl) this.cl = chl.store;
+            else if (!chl || !chl.store) hasLeft = false;
 
-            if (chu) this.cu = &chu.blocks;
-            else if (!chu || !chu.isReady) hasUp = false;
+            if (chr) this.cr = chr.store;
+            else if (!chr || !chr.store) hasRight = false;
 
-            if (chd) this.cd = &chd.blocks;
-            else if (!chd || !chd.isReady) hasDown = false;
+            if (chu) this.cu = chu.store;
+            else if (!chu || !chu.store) hasUp = false;
 
-            if (chf) this.cf = &chf.blocks;
-            else if (!chf || !chf.isReady) hasFront = false;
+            if (chd) this.cd = chd.store;
+            else if (!chd || !chd.store) hasDown = false;
 
-            if (chb) this.cb = &chb.blocks;
-            else if (!chb || !chb.isReady) hasBack = false;
+            if (chf) this.cf = chf.store;
+            else if (!chf || !chf.store) hasFront = false;
+
+            if (chb) this.cb = chb.store;
+            else if (!chb || !chb.store) hasBack = false;
     }
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* blocks;
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cl;
+    immutable(ChunkBlockStore)* mstore;
+    immutable(ChunkBlockStore)* cl;
     bool hasLeft = true;
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cr;
+    immutable(ChunkBlockStore)* cr;
     bool hasRight = true;
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cu;
+    immutable(ChunkBlockStore)* cu;
     bool hasUp = true;
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cd;
+    immutable(ChunkBlockStore)* cd;
     bool hasDown = true;
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cf;
+    immutable(ChunkBlockStore)* cf;
     bool hasFront = true;
 
-    BlockRef[ChunkSize][ChunkSize][ChunkSize]* cb;
+    immutable(ChunkBlockStore)* cb;
     bool hasBack = true;
 }
 
@@ -133,7 +135,7 @@ struct MeshGenTask {
         Returns the distance of this task to the player
     */
     float distanceToPlayer() {
-        return chunk.chunk.worldPosition.distance(TheWorld.player.position);
+        return abs(chunk.chunk.worldPosition.distance(FcCamera.position));
     }
 }
 
@@ -161,25 +163,21 @@ private static:
                 for(int x; x < ChunkSize; x++) {
 
                     // Air blocks create no meshed part
-                    if ((*data.blocks)[x][y][z] == 0) continue;
+                    if (data.mstore.blocks[x][y][z] == 0) continue;
 
-                    Block block = fcGetBlock((*data.blocks)[x][y][z]);
+                    Block block = fcGetBlock(data.mstore.blocks[x][y][z]);
 
                     // Skip blocks with invalid IDs; TODO: make those blocks a special placeholder block
                     if (block is null) continue;
 
-                    bool blockFreeLeft =    (x > 0              && (*data.blocks)[x-1][y][z] == 0) || (x == 0 && data.hasLeft && (*data.cl)[ChunkSize-1][y][z] == 0)      || (!data.hasLeft && x == 0);
-                    bool blockFreeRight =   (x < ChunkSize-1    && (*data.blocks)[x+1][y][z] == 0) || (x == ChunkSize-1 && data.hasRight && (*data.cr)[0][y][z] == 0)     || (!data.hasRight && x == ChunkSize-1);
+                    bool blockFreeLeft =    (x > 0              && data.mstore.blocks[x-1][y][z] == 0) || (x == 0 && data.hasLeft && data.cl.blocks[ChunkSize-1][y][z] == 0)      || (!data.hasLeft && x == 0);
+                    bool blockFreeRight =   (x < ChunkSize-1    && data.mstore.blocks[x+1][y][z] == 0) || (x == ChunkSize-1 && data.hasRight && data.cr.blocks[0][y][z] == 0)     || (!data.hasRight && x == ChunkSize-1);
 
+                    bool blockFreeBottom =  (y > 0              && data.mstore.blocks[x][y-1][z] == 0) || (y == 0 && data.hasDown && data.cd.blocks[x][ChunkSize-1][z] == 0)      || (!data.hasDown && y == 0);
+                    bool blockFreeTop =     (y < ChunkSize-1    && data.mstore.blocks[x][y+1][z] == 0) || (y == ChunkSize-1 && data.hasUp && data.cu.blocks[x][0][z] == 0)        || (!data.hasUp && y == ChunkSize-1);
 
-                    import std.stdio : writefln;
-                    //if (y == 0) writefln("y=%s, isOnEdge=%s, hasDown=%s, cdl=%s", y, (!data.hasDown && y == 0), data.hasDown, data.cd.length);
-
-                    bool blockFreeBottom =  (y > 0              && (*data.blocks)[x][y-1][z] == 0) || (y == 0 && data.hasDown && (*data.cd)[x][ChunkSize-1][z] == 0)      || (!data.hasDown && y == 0);
-                    bool blockFreeTop =     (y < ChunkSize-1    && (*data.blocks)[x][y+1][z] == 0) || (y == ChunkSize-1 && data.hasUp && (*data.cu)[x][0][z] == 0)        || (!data.hasUp && y == ChunkSize-1);
-
-                    bool blockFreeBack =    (z > 0              && (*data.blocks)[x][y][z-1] == 0) || (z == 0 && data.hasBack && (*data.cb)[x][y][ChunkSize-1] == 0)      || (!data.hasBack && z == 0);
-                    bool blockFreeFront =   (z < ChunkSize-1    && (*data.blocks)[x][y][z+1] == 0) || (z == ChunkSize-1 && data.hasFront && (*data.cf)[x][y][0] == 0)    || (!data.hasFront && z == ChunkSize-1);
+                    bool blockFreeBack =    (z > 0              && data.mstore.blocks[x][y][z-1] == 0) || (z == 0 && data.hasBack && data.cb.blocks[x][y][ChunkSize-1] == 0)      || (!data.hasBack && z == 0);
+                    bool blockFreeFront =   (z < ChunkSize-1    && data.mstore.blocks[x][y][z+1] == 0) || (z == ChunkSize-1 && data.hasFront && data.cf.blocks[x][y][0] == 0)    || (!data.hasFront && z == ChunkSize-1);
 
                     vec3 cpos = vec3(x, y, z);
 
@@ -276,26 +274,32 @@ private static:
         setMaxMailboxSize(thisTid, 0, OnCrowding.ignore);
         while (atomicLoad(shouldRun)) {
             try {
-                receiveTimeout(-1.msecs, (immutable(MeshGenTask)* task) {
+                while (receiveTimeout(-1.msecs, (immutable(MeshGenTask)* task) {
                     taskQueue ~= cast(MeshGenTask*)task;
 
-                    import std.math : cmp;
-                    taskQueue.sort!((a, b) => cmp(b.distanceToPlayer(), a.distanceToPlayer()) > 0);
-                });
+                })) { }
 
                 if (taskQueue.length > 0) {
-                    // Get the next task and remove it from the queue, we need to unlock as fast as possible.
-                    MeshGenTask* ctask = taskQueue[0];
-                    taskQueue = taskQueue[1..$];
+                    // import std.math : cmp;
+                    // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
 
-                    auto data = generateMesh(ctask.data);
-                    destroy(ctask.data);
-                    send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
-                } 
+                    while (taskQueue.length > 0 && atomicLoad(shouldRun)) {
+
+                        // Get the task and remove it from the queue
+                        MeshGenTask* ctask = taskQueue[0];
+                        taskQueue = taskQueue[1..$];
+
+                        // Generate a mesh for the task
+                        auto data = generateMesh(ctask.data);
+
+                        // Send it back to our main thread so that it can be sent on to OpenGL
+                        send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
+                    }
+                }
                 Thread.sleep(10.msecs);
-            } catch (Exception ex) {
-                import std.stdio;
-                writeln(ex.msg);
+            } catch(Exception ex) {
+                import std.stdio : writeln;
+                writeln("[ERROR] ChunkMesher: ", ex.msg);
             }
         }
     }
@@ -317,11 +321,13 @@ public static:
     }
 
     void update() {
-        receiveTimeout(-1.msecs, (immutable(MeshGenResponse)* response) {
+        size_t counter = 0;
+        enum COUNTER_MAX_FRAME = 100;
+        while(counter < COUNTER_MAX_FRAME && receiveTimeout(-1.msecs, (immutable(MeshGenResponse)* response) {
             ChunkMesh rchunk = cast(ChunkMesh)response.chunk;
             rchunk.buffer.pass(new immutable(CMDataArr)(response.data));
             rchunk.buffer.upload();
-        });
+        })) counter++;
     }
 
     /**

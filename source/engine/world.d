@@ -4,6 +4,7 @@ import engine.render;
 import game.entities.player;
 
 import core.sync.rwmutex : ReadWriteMutex;
+import open_simplex_2.open_simplex_2_f : OpenSimplex2F;
 
 /**
     Block height of the world
@@ -77,29 +78,42 @@ public:
         fcGameSetRelativeMouse(true);
 
         player = new PlayerEntity(this);
+        import std.random : uniform;
+        OpenSimplex2F osimplex = new OpenSimplex2F(uniform(0, ulong.max));
+        
 
-        foreach(cx; 0..16) {
-            foreach(cy; 0..16) {
-                foreach(cz; 0..16) {
-                    if (cy < 16) {
-                        Chunk chunk = new Chunk(this, vec3i(cx-8, cy, cz-8));
-                        foreach(x; 0..ChunkSize) {
-                            foreach(y; 0..ChunkSize) {
-                                foreach(z; 0..ChunkSize) {
-                                    chunk.blocks[x][y][z] = (cy*ChunkSize)+y == 255 ? 2 : 1;
-                                }
+        foreach(cx; 0..32) {
+            foreach(cy; 0..32) {
+                foreach(cz; 0..32) {
+                    Chunk chunk = new Chunk(this, vec3i(cx-16, cy, cz-16));
+                    BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks;
+                    foreach(x; 0..ChunkSize) {
+                        foreach(y; 0..ChunkSize) {
+                            foreach(z; 0..ChunkSize) {
+                                double noise1 = osimplex.noise2(
+                                    cast(double)(1000+(cx*ChunkSize)+x)*0.001, 
+                                    cast(double)(1000+(cz*ChunkSize)+z)*0.001
+                                )*3;
+                                double noise2 = osimplex.noise2(
+                                    cast(double)((cx*ChunkSize)+x)/100, 
+                                    cast(double)((cz*ChunkSize)+z)/100
+                                );
+
+                                int height = cast(int)(
+                                    (256-16)+(((noise2*noise1)/2)*16)
+                                );
+
+                                if ((cy*ChunkSize)+y == height) blocks[x][y][z] = 2;
+                                else if ((cy*ChunkSize)+y < height) blocks[x][y][z] = 1;
                             }
                         }
-
-                        this.addChunk(chunk);
-                    } else {
-                        // Adds empty chunk
-                        Chunk chunk = new Chunk(this, vec3i(cx-8, cy, cz-8));
-                        this.addChunk(chunk);
                     }
+                    chunk.setChunkBlocks(blocks);
+                    this.addChunk(chunk, false);
                 }
             }
         }
+        this.forceMeshUpdates();
     }
 
     /**
@@ -118,15 +132,25 @@ public:
     uint getSeed() { return seed; }
 
     /**
+        Force mesh updates to occur
+    */
+    void forceMeshUpdates() {
+        foreach(chunk; chunks) {
+            chunk.invalidateMesh(false);
+        }
+    }
+
+    /**
         Updates and draws the world
     */
     void update() {
+        
+        // Updates player
+        player.update();
+
         foreach(chunk; chunks) {
             chunk.draw();
         }
-
-        // Updates player
-        player.update();
 
         // Updates entities
         foreach(entity; entities) {
@@ -137,10 +161,10 @@ public:
     /**
         Adds a chunk in to the world
     */
-    void addChunk(Chunk chunk) {
+    void addChunk(Chunk chunk, bool invalidate = true) {
         WorldPos cPos = WorldPos(chunk.position);
         chunks[cPos] = chunk;
-        chunks[cPos].invalidateMesh();
+        if (invalidate) chunks[cPos].invalidateMesh();
     }
 
     /**
@@ -153,24 +177,55 @@ public:
         if (chunkPos !in chunks) return null;
 
         WorldPos blockPos;
-        if (position.x < 0) blockPos.x = abs(ChunkSize-position.x)%ChunkSize-1;
+        if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
         else blockPos.x = position.x&ChunkSize-1;
-        if (position.y < 0) blockPos.y = abs(ChunkSize-position.y)%ChunkSize-1;
+        if (position.y < 0) blockPos.y = abs(position.y)%ChunkSize-1;
         else blockPos.y = position.y&ChunkSize-1;
-        if (position.z < 0) blockPos.z = abs(ChunkSize-position.z)%ChunkSize-1;
+        if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
         else blockPos.z = position.z&ChunkSize-1;
 
         import std.stdio : writeln;
 
         // Return block
-        return fcGetBlock(chunks[chunkPos].blocks[blockPos.x][blockPos.y][blockPos.z]);
+        return fcGetBlock(chunks[chunkPos].store.blocks[blockPos.x][blockPos.y][blockPos.z]);
+    }
+
+    /**
+        Gets the block at the specified position
+    */
+    void setBlockAt(WorldPos position, uint block) {
+        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+
+        // Early return, no chunk found
+        if (chunkPos !in chunks) return;
+
+        WorldPos blockPos;
+        if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
+        else blockPos.x = position.x&ChunkSize-1;
+        if (position.y < 0) blockPos.y = abs(position.y)%ChunkSize-1;
+        else blockPos.y = position.y&ChunkSize-1;
+        if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
+        else blockPos.z = position.z&ChunkSize-1;
+
+        import std.stdio : writeln;
+
+        // Return block
+        chunks[chunkPos].setBlockAt(blockPos, block);
+    }
+
+    /**
+        Gets the chunk at the specified position
+    */
+    Chunk getChunkAtWorldPos(WorldPos position) {
+        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+        return chunkPos in chunks ? chunks[chunkPos] : null;
     }
 
     /**
         Gets the chunk at the specified position
     */
     Chunk getChunkAt(WorldPos position) {
-        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+        WorldPos chunkPos = WorldPos(position.x, position.y, position.z);
         return chunkPos in chunks ? chunks[chunkPos] : null;
     }
 }

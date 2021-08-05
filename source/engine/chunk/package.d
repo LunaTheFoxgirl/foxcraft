@@ -21,6 +21,17 @@ enum ChunkSizeSquared = ChunkSize*ChunkSize;
 enum ChunkSizeCubed = ChunkSizeSquared*ChunkSizeSquared;
 
 /**
+    Internal store for blocks that's atomically swappable
+*/
+struct ChunkBlockStore {
+
+    /**
+        A list of blocks in the world
+    */
+    BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks;
+}
+
+/**
     A chunk
 */
 class Chunk {
@@ -37,9 +48,25 @@ package(engine):
     ChunkMesh mesh;
 
     /**
-        A list of blocks in the world
+        The chunk block store
     */
-    BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks;
+    immutable(ChunkBlockStore)* store;
+
+    /**
+        Updates the memory store
+    */
+    void _storeUpdate(immutable(ChunkBlockStore)* newStore) {
+        import core.atomic : atomicExchange;
+        cast(void)atomicExchange(&store, newStore);
+    }
+
+    bool meshInvalid;
+    /**
+        Invalidates the chunk's mesh and optionally does the same for the surrounding chunks
+    */
+    void updateMesh() {
+        mesh.regenerate();
+    }
 
 public:
 
@@ -48,8 +75,18 @@ public:
     */
     vec3i position;
 
+    /**
+        Gets the world position of the chunk
+    */
     vec3 worldPosition() {
         return vec3(position.x*ChunkSize, position.y*ChunkSize, position.z*ChunkSize);
+    }
+
+    /**
+        Gets the world position of the chunk
+    */
+    vec3 worldPositionCenter() {
+        return vec3((position.x+8)*ChunkSize, (position.y+8)*ChunkSize, (position.z+8)*ChunkSize);
     }
 
     /**
@@ -59,6 +96,16 @@ public:
         this.world = world;
         this.position = position;
         this.mesh = new ChunkMesh(this);
+        BlockRef[ChunkSize][ChunkSize][ChunkSize] chunkData = new BlockRef[ChunkSize][ChunkSize][ChunkSize];
+        store = new ChunkBlockStore(chunkData);
+    }
+
+    /**
+        Loads blocks
+    */
+    void setChunkBlocks(BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks) {
+        BlockRef[ChunkSize][ChunkSize][ChunkSize] bcopy = blocks.dup;
+        this._storeUpdate(new ChunkBlockStore(bcopy));
     }
 
     /**
@@ -71,7 +118,7 @@ public:
         Invalidates the chunk's mesh and optionally does the same for the surrounding chunks
     */
     void invalidateMesh(bool invalidateOthers = true) {
-        mesh.regenerate();
+        this.updateMesh();
         if (invalidateOthers) {
 
             // Update surrounding chunks
@@ -106,28 +153,32 @@ public:
         Gets whether there's a block at the specified location
     */
     bool hasBlockAt(WorldPos blockPos) {
-        if (blockPos.x < 0) blockPos.x = abs(blockPos.x)%ChunkSize-1;
-        else blockPos.x = blockPos.x&ChunkSize-1;
-        if (blockPos.y < 0) blockPos.y = abs(blockPos.y)%ChunkSize-1;
-        else blockPos.y = blockPos.y&ChunkSize-1;
-        if (blockPos.z < 0) blockPos.z = abs(blockPos.z)%ChunkSize-1;
-        else blockPos.z = blockPos.z&ChunkSize-1;
-        return this.blocks[blockPos.x][blockPos.y][blockPos.z] > 0;
+        if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
+        else blockPos.x = blockPos.x%ChunkSize;
+        if (blockPos.y <= 0) blockPos.y = (ChunkSize-1)-(abs(blockPos.y)%ChunkSize);
+        else blockPos.y = blockPos.y%ChunkSize;
+        if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
+        else blockPos.z = blockPos.z%ChunkSize;
+        return this.store.blocks[blockPos.x][blockPos.y][blockPos.z] > 0;
     }
 
     /**
         Sets block in chunk
     */
     void setBlockAt(WorldPos blockPos, uint block) {
-        if (blockPos.x < 0) blockPos.x = abs(blockPos.x)%ChunkSize-1;
-        else blockPos.x = blockPos.x&ChunkSize-1;
-        if (blockPos.y < 0) blockPos.y = abs(blockPos.y)%ChunkSize-1;
-        else blockPos.y = blockPos.y&ChunkSize-1;
-        if (blockPos.z < 0) blockPos.z = abs(blockPos.z)%ChunkSize-1;
-        else blockPos.z = blockPos.z&ChunkSize-1;
+        if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
+        else blockPos.x = blockPos.x%ChunkSize;
+        if (blockPos.y <= 0) blockPos.y = (ChunkSize-1)-(abs(blockPos.y)%ChunkSize);
+        else blockPos.y = blockPos.y%ChunkSize;
+        if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
+        else blockPos.z = blockPos.z%ChunkSize;
 
-        this.blocks[blockPos.x][blockPos.y][blockPos.z] = block;
-        this.invalidateMesh();
+        auto store = *store;
+        BlockRef[ChunkSize][ChunkSize][ChunkSize] oldBlockList = store.blocks.dup;
+        oldBlockList[blockPos.x][blockPos.y][blockPos.z] = block;
+
+        this._storeUpdate(new ChunkBlockStore(oldBlockList));
+        this.invalidateMesh(true);
     }
 
     /**

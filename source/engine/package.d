@@ -43,6 +43,7 @@ void fcInitEngine() {
     // Initialize game systems
     fcInitAtlas();
     fcInitChunkMeshRender();
+    fcInitBlockSelect();
 
     // Initialize game resources
     fcInitBlocks();
@@ -105,7 +106,8 @@ void fcStartEngine() {
         }
 
         // Update the game and render
-        glClearColor(0, 0, 0, 0);
+        if (FcCamera.position.y < 16) glClearColor(0, 0, 0, 1);
+        else glClearColor(0.45, 0.45, 0.85, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         MeshGenerator.update();

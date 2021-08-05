@@ -4,13 +4,15 @@ import engine;
 import engine.render;
 import core.sync.mutex;
 
+enum ATLAS_RESOLUTION = 8192; // 16_384;
+
 /**
     Initializes the block and item atlas
 */
 void fcInitAtlas() {
     uvStoreMutex = new Mutex();
-    atlasTexture = new Texture(16_384, 16_384);
-    packer = new TexturePacker(vec2i(16_384, 16_384));
+    atlasTexture = new Texture(ATLAS_RESOLUTION, ATLAS_RESOLUTION); //16_384, 16_384);
+    packer = new TexturePacker(vec2i(ATLAS_RESOLUTION, ATLAS_RESOLUTION)); //16_384, 16_384));
 }
 
 private {
@@ -43,10 +45,10 @@ void fcAtlasAddTexture(string name) {
 
     uvStoreMutex.lock();
     uvStore[name] = vec4(
-        cast(float)uvPixels.x/16_384f,
-        cast(float)uvPixels.y/16_384f,
-        cast(float)(uvPixels.x+uvPixels.z)/16_384f,
-        cast(float)(uvPixels.y+uvPixels.w)/16_384f
+        cast(float)uvPixels.x/ATLAS_RESOLUTION,
+        cast(float)uvPixels.y/ATLAS_RESOLUTION,
+        cast(float)(uvPixels.x+uvPixels.z)/ATLAS_RESOLUTION,
+        cast(float)(uvPixels.y+uvPixels.w)/ATLAS_RESOLUTION
     );
     uvStoreMutex.unlock();
 }

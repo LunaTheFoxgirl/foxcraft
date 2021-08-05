@@ -1,6 +1,5 @@
 #version 330
 in vec2 texUVs;
-in vec2 texSize;
 in float lightValue;
 out vec4 outColor;
 
