@@ -15,6 +15,8 @@ private {
     GLuint chunkVAO;
     Shader blockShader;
     GLint mvp;
+    GLint chunkPosition;
+    GLint cameraPosition;
 }
 
 /**
@@ -106,6 +108,8 @@ void fcInitChunkMeshRender() {
     glGenVertexArrays(1, &chunkVAO);
     blockShader = new Shader(import("block.vert"), import("block.frag"));
     mvp = blockShader.getUniformLocation("mvp");
+    chunkPosition = blockShader.getUniformLocation("chunkPosition");
+    cameraPosition = blockShader.getUniformLocation("cameraPosition");
 }
 
 /**
@@ -144,17 +148,16 @@ public:
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
-        glEnable(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
 
         blockShader.use();
         blockShader.setUniform(mvp, 
-            FcCamera.getMatrix()*
-            mat4.translation(
-                chunk.position.x*ChunkSize, 
-                chunk.position.y*ChunkSize, 
-                chunk.position.z*ChunkSize
-            )
+            FcCamera.getMatrix() * 
+            mat4.translation(chunk.worldPosition)
         );
+        
+        blockShader.setUniform(chunkPosition, chunk.worldPosition);
+        blockShader.setUniform(cameraPosition, FcCamera.worldPosition);
 
         fcAtlasBind();
 

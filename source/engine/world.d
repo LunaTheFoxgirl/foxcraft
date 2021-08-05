@@ -102,6 +102,8 @@ public:
                                 int height = cast(int)(
                                     (256-16)+(((noise2*noise1)/2)*16)
                                 );
+                                if (x % 8 == 0 && z % 8 == 0) height += 2;
+                                height = 255;
 
                                 if ((cy*ChunkSize)+y == height) blocks[x][y][z] = 2;
                                 else if ((cy*ChunkSize)+y < height) blocks[x][y][z] = 1;
@@ -193,7 +195,7 @@ public:
     /**
         Gets the block at the specified position
     */
-    void setBlockAt(WorldPos position, uint block) {
+    void setBlockAt(WorldPos position, BlockRef block) {
         WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
 
         // Early return, no chunk found

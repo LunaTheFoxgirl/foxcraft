@@ -18,10 +18,13 @@ private:
 
 
     void updateBlockLookAt() {
-        vec3 forwardVector = vec4(0, 0, 0.8, 1) * FcCamera.getRotationMatrix();
+        enum PLACE_DISTANCE = 6;
+        enum PLACE_ITER = 0.1;
+
+        vec3 forwardVector = vec4(0, 0, PLACE_ITER, 1) * FcCamera.getRotationMatrix();
         vec3 ray = FcCamera.position;
         vec3 lastRay;
-        foreach(i; 0..12) {
+        foreach(i; 0..PLACE_DISTANCE/PLACE_ITER) {
             lastRay = ray;
             ray += forwardVector;
             auto rayBlock = WorldPos(vec3i(-cast(int)floor(ray.x), cast(int)floor(abs(ray.y)), -cast(int)floor(ray.z)));
@@ -44,6 +47,7 @@ public:
     */
     this(World world) {
         super(world);
+        this.position = vec3(0, -256, 0);
     }
 
     override
@@ -54,13 +58,14 @@ public:
         vec2 mMotion = fcMouseMotion();
 
         if (fcGameGetRelativeMouse()) {
-            FcCamera.rotation.x += radians(mMotion.y)*0.8;
             FcCamera.rotation.y += radians(mMotion.x)*0.8;
+            FcCamera.rotation.x += radians(mMotion.y)*0.8;
             FcCamera.rotation.x = clamp(FcCamera.rotation.x, -radians(90), radians(90));
             
-            vec3 rightVector = vec4(MoveSpeed, 0, 0, 1) * FcCamera.getRotationMatrix();
             vec3 upVector = vec4(0, MoveSpeed, 0, 1);
-            vec3 forwardVector = vec4(0, 0, MoveSpeed, 1) * FcCamera.getRotationMatrix();
+            mat4 cameraRotMatr = mat4.yrotation(FcCamera.rotation.y);
+            vec3 rightVector = vec4(MoveSpeed, 0, 0, 1) * cameraRotMatr;
+            vec3 forwardVector = vec4(0, 0, MoveSpeed, 1) * cameraRotMatr;
 
             if (kstate.isKeyDown(Keys.W)) position += forwardVector;
             if (kstate.isKeyDown(Keys.S)) position -= forwardVector;
@@ -70,7 +75,7 @@ public:
             if (kstate.isKeyDown(Keys.Space)) position -= upVector;
         }
 
-        FcCamera.position = vec3(position.x, position.y - 1, position.z);
+        FcCamera.position = vec3(position.x, position.y + 1, position.z);
 
         this.updateBlockLookAt();
         if (lookingAt) fcDrawBlockSelection(*lookingAt);

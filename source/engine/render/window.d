@@ -134,7 +134,7 @@ void fcGameSetRelativeMouse(bool mode) {
 }
 
 /**
-    Sets relative mouse mode
+    Gets relative mouse mode
 */
 bool fcGameGetRelativeMouse() {
     return cast(bool)SDL_GetRelativeMouseMode();

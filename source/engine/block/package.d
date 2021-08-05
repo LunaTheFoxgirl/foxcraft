@@ -6,7 +6,7 @@ import engine;
 /**
     A block reference
 */
-alias BlockRef = uint;
+alias BlockRef = ushort;
 
 /**
     A block

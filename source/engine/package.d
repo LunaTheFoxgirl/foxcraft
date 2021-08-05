@@ -12,10 +12,7 @@ public import engine.chunk;
 public import engine.chunk.mesh;
 public import engine.chunk.meshgen;
 public import engine.input;
-
-public import gl3n.linalg; // Math is pretty important in general
-public import gl3n.math;
-public import gl3n.interpolate;
+public import engine.math;
 
 import std.stdio : writeln;
 
@@ -106,7 +103,7 @@ void fcStartEngine() {
         }
 
         // Update the game and render
-        if (FcCamera.position.y < 16) glClearColor(0, 0, 0, 1);
+        if (FcCamera.worldPosition.y < 16) glClearColor(0, 0, 0, 1);
         else glClearColor(0.45, 0.45, 0.85, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 

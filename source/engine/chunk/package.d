@@ -165,7 +165,7 @@ public:
     /**
         Sets block in chunk
     */
-    void setBlockAt(WorldPos blockPos, uint block) {
+    void setBlockAt(WorldPos blockPos, BlockRef block) {
         if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
         else blockPos.x = blockPos.x%ChunkSize;
         if (blockPos.y <= 0) blockPos.y = (ChunkSize-1)-(abs(blockPos.y)%ChunkSize);

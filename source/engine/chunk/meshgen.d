@@ -135,7 +135,7 @@ struct MeshGenTask {
         Returns the distance of this task to the player
     */
     float distanceToPlayer() {
-        return abs(chunk.chunk.worldPosition.distance(FcCamera.position));
+        return abs(chunk.chunk.worldPosition.distance(FcCamera.worldPosition));
     }
 }
 
@@ -280,8 +280,8 @@ private static:
                 })) { }
 
                 if (taskQueue.length > 0) {
-                    // import std.math : cmp;
-                    // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
+                    import std.math : cmp;
+                    taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
 
                     while (taskQueue.length > 0 && atomicLoad(shouldRun)) {
 
