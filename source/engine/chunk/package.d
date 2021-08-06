@@ -128,8 +128,8 @@ public:
     /**
         Invalidates the chunk's mesh and optionally does the same for the surrounding chunks
     */
-    void invalidateMesh(bool invalidateOthers = true) {
-        this.updateMesh();
+    void invalidateMesh(bool invalidateOthers = true, bool highPriority = false) {
+        mesh.regenerate(highPriority);
         if (invalidateOthers) {
 
             // Update surrounding chunks
@@ -139,12 +139,12 @@ public:
             Chunk bottomChunk = this.chunkBottom;
             Chunk frontChunk = this.chunkFront;
             Chunk backChunk = this.chunkBack;
-            if (leftChunk) leftChunk.invalidateMesh(false);
-            if (rightChunk) rightChunk.invalidateMesh(false);
-            if (topChunk) topChunk.invalidateMesh(false);
-            if (bottomChunk) bottomChunk.invalidateMesh(false);
-            if (frontChunk) frontChunk.invalidateMesh(false);
-            if (backChunk) backChunk.invalidateMesh(false);
+            if (leftChunk) leftChunk.invalidateMesh(false, highPriority);
+            if (rightChunk) rightChunk.invalidateMesh(false, highPriority);
+            if (topChunk) topChunk.invalidateMesh(false, highPriority);
+            if (bottomChunk) bottomChunk.invalidateMesh(false, highPriority);
+            if (frontChunk) frontChunk.invalidateMesh(false, highPriority);
+            if (backChunk) backChunk.invalidateMesh(false, highPriority);
         }
     }
 
@@ -209,7 +209,7 @@ public:
         oldBlockList[blockPos.x][blockPos.y][blockPos.z] = block;
 
         this._storeUpdate(new ChunkBlockStore(oldBlockList));
-        this.invalidateMesh(true);
+        this.invalidateMesh(true, true);
     }
 
     /**

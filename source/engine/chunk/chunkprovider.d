@@ -84,15 +84,47 @@ private static:
                 if (lastIdx == chunksToLoad.length) chunksToLoad = null;
                 
             } else {
-                Thread.sleep(50.msecs);
+                Thread.sleep(10.msecs);
             }
         }
     }
 
     WorldPos[] scanForEmpty(WorldPos origin) {
         WorldPos[] toLoad;
-        foreach(x; 0..VIEW_DISTANCE) {
-            foreach(y; 0..VIEW_DISTANCE) {
+
+        // bool[VIEW_DISTANCE][VIEW_DISTANCE][VIEW_DISTANCE] checkedSpots;
+        // bool checkValidity(WorldPos pos) {
+        //     return 
+        //         pos.x >= 0 && pos.x < VIEW_DISTANCE &&
+        //         pos.y >= 0 && pos.y < VIEW_DISTANCE &&
+        //         pos.z >= 0 && pos.z < VIEW_DISTANCE && !checkedSpots[pos.x][pos.y][pos.z];
+        // }
+
+        // WorldPos[] queue;
+        // queue ~= WorldPos(VIEW_DISTANCE_HALF, VIEW_DISTANCE_HALF, VIEW_DISTANCE_HALF);
+        // while(queue.length > 0) {
+        //     WorldPos self = queue[$-1];
+        //     queue.length--;
+
+        //     checkedSpots[self.x][self.y][self.z] = true;
+
+        //     WorldPos position = WorldPos(
+        //         origin.x+(self.x-VIEW_DISTANCE_HALF), 
+        //         origin.y+(self.y-VIEW_DISTANCE_HALF), 
+        //         origin.z+(self.z-VIEW_DISTANCE_HALF)
+        //     );
+        //     if (position !in TheWorld.chunks) toLoad ~= position;
+
+        //     if (checkValidity(WorldPos(self.x, self.y-1, self.z))) queue ~= WorldPos(self.x, self.y-1, self.z);
+        //     if (checkValidity(WorldPos(self.x, self.y+1, self.z))) queue ~= WorldPos(self.x, self.y+1, self.z);
+        //     if (checkValidity(WorldPos(self.x-1, self.y, self.z))) queue ~= WorldPos(self.x-1, self.y, self.z);
+        //     if (checkValidity(WorldPos(self.x+1, self.y, self.z))) queue ~= WorldPos(self.x+1, self.y, self.z);
+        //     if (checkValidity(WorldPos(self.x, self.y, self.z-1))) queue ~= WorldPos(self.x, self.y, self.z-1);
+        //     if (checkValidity(WorldPos(self.x, self.y, self.z+1))) queue ~= WorldPos(self.x, self.y, self.z+1);
+        // }
+
+        foreach_reverse(y; 0..VIEW_DISTANCE) {
+            foreach(x; 0..VIEW_DISTANCE) {
                 foreach(z; 0..VIEW_DISTANCE) {
                     WorldPos position = WorldPos(origin.x+(x-VIEW_DISTANCE_HALF), origin.y+(y-VIEW_DISTANCE_HALF), origin.z+(z-VIEW_DISTANCE_HALF));
                     if (position !in TheWorld.chunks) toLoad ~= position;
@@ -213,9 +245,9 @@ public static:
             cast(int)(TheWorld.player.worldPosition.z/ChunkSize)
         );
 
-        foreach(cx; 0..8) {
-            foreach(cy; 0..8) {
-                foreach(cz; 0..8) {
+        foreach(cx; 0..VIEW_DISTANCE) {
+            foreach(cy; 0..VIEW_DISTANCE) {
+                foreach(cz; 0..VIEW_DISTANCE) {
                     vec3i cpos = vec3i((playerChunkPos.x-4)+cx, (playerChunkPos.y-4)+cy, (playerChunkPos.z-4)+cz);
                     Chunk chunk = generate(cpos);
                     TheWorld.addChunk(chunk, false);

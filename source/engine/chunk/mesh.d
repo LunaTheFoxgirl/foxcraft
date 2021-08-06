@@ -138,11 +138,11 @@ public:
 
         TODO: use a better meshing method
     */
-    void regenerate() {
+    void regenerate(bool highPriority = false) {
         MeshGenerator.enqueue(new immutable(MeshGenTask)(
             cast(immutable(ChunkMesh))this, 
             cast(immutable(CMView))CMView(chunk)
-        ));
+        ), highPriority);
     }
 
     /**

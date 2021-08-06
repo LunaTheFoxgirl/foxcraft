@@ -278,27 +278,26 @@ private static:
         setMaxMailboxSize(thisTid, 0, OnCrowding.ignore);
         while (atomicLoad(shouldRun)) {
             try {
-                while (receiveTimeout(0.msecs, (immutable(MeshGenTask)* task) {
-                    taskQueue ~= cast(MeshGenTask*)task;
+                while (atomicLoad(shouldRun) && receiveTimeout(-1.msecs, (immutable(MeshGenTask)* task) {
+                    // taskQueue ~= cast(MeshGenTask*)task;
+                    
+                    // Get the task and remove it from the queue
+                    MeshGenTask* ctask = cast(MeshGenTask*)task;
+
+                    // Generate a mesh for the task
+                    auto data = generateMesh(ctask.data);
+
+                    // Send it back to our main thread so that it can be sent on to OpenGL
+                    send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
                 })) { }
 
-                if (taskQueue.length > 0) {
-                    // import std.math : cmp;
-                    // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
+                // if (taskQueue.length > 0) {
+                //     // import std.math : cmp;
+                //     // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
 
-                    while (taskQueue.length > 0 && atomicLoad(shouldRun)) {
-
-                        // Get the task and remove it from the queue
-                        MeshGenTask* ctask = taskQueue[0];
-                        taskQueue = taskQueue[1..$];
-
-                        // Generate a mesh for the task
-                        auto data = generateMesh(ctask.data);
-
-                        // Send it back to our main thread so that it can be sent on to OpenGL
-                        send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
-                    }
-                }
+                //     while (taskQueue.length > 0 && ) {
+                //     }
+                // }
 
                 Thread.sleep(100.msecs);
             } catch(Exception ex) {
@@ -340,8 +339,9 @@ public static:
     /**
         enqueues the specificed mesh generator task
     */
-    void enqueue(immutable(MeshGenTask)* task) {
+    void enqueue(immutable(MeshGenTask)* task, bool highPriority = false) {
         if (task.chunk.buffer is null) return; // Can't enqueue a dead buffer
-        send(meshGeneratorThread, task);
+        if (highPriority) prioritySend(meshGeneratorThread, task);
+        else send(meshGeneratorThread, task);
     }
 }
