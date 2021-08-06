@@ -55,6 +55,10 @@ public:
     */
     GLuint vbo;
 
+    ~this() {
+        glDeleteBuffers(1, &vbo);
+    }
+
     /**
         Constructs a vertex buffer
     */
@@ -120,6 +124,10 @@ public:
     Chunk chunk;
     ChunkVertexBuffer buffer;
 
+    ~this() {
+        destroy(buffer);
+    }
+
     this(Chunk chunk) {
         this.chunk = chunk;
         this.buffer = new ChunkVertexBuffer();
@@ -148,7 +156,8 @@ public:
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
-        glDisable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
 
         blockShader.use();
         blockShader.setUniform(mvp, 

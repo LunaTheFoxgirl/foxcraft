@@ -89,6 +89,10 @@ public:
         return vec3((position.x+8)*ChunkSize, (position.y+8)*ChunkSize, (position.z+8)*ChunkSize);
     }
 
+    ~this() {
+        destroy(mesh);
+    }
+
     /**
         Initializes a chunk
     */
@@ -100,12 +104,19 @@ public:
         store = new ChunkBlockStore(chunkData);
     }
 
+
+    /**
+        Initializes a chunk
+    */
+    this(World world, WorldPos position) {
+        this(world, position.toVec3i());
+    }
+
     /**
         Loads blocks
     */
     void setChunkBlocks(BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks) {
-        BlockRef[ChunkSize][ChunkSize][ChunkSize] bcopy = blocks.dup;
-        this._storeUpdate(new ChunkBlockStore(bcopy));
+        this._storeUpdate(new ChunkBlockStore(blocks));
     }
 
     /**
@@ -135,6 +146,26 @@ public:
             if (frontChunk) frontChunk.invalidateMesh(false);
             if (backChunk) backChunk.invalidateMesh(false);
         }
+    }
+
+    /**
+        Invalidates the chunk's mesh and optionally does the same for the surrounding chunks
+    */
+    void invalidateAdjacent(bool invalidateOthers = true) {
+        
+        // Update surrounding chunks
+        Chunk leftChunk = this.chunkLeft;
+        Chunk rightChunk = this.chunkRight;
+        Chunk topChunk = this.chunkTop;
+        Chunk bottomChunk = this.chunkBottom;
+        Chunk frontChunk = this.chunkFront;
+        Chunk backChunk = this.chunkBack;
+        if (leftChunk) leftChunk.invalidateMesh(false);
+        if (rightChunk) rightChunk.invalidateMesh(false);
+        if (topChunk) topChunk.invalidateMesh(false);
+        if (bottomChunk) bottomChunk.invalidateMesh(false);
+        if (frontChunk) frontChunk.invalidateMesh(false);
+        if (backChunk) backChunk.invalidateMesh(false);
     }
 
     /**

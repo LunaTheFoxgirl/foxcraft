@@ -23,7 +23,22 @@ package(engine):
     */
     string name;
 
+    /**
+        Human readable name
+    */
+    string displayName;
+
+    /**
+        ID of the block
+    */
+    BlockRef id;
+
 protected:
+
+    /**
+        Collission for the block
+    */
+    AABB[] collission;
     
     /**
         Sets texture for all faces of the block
@@ -58,17 +73,52 @@ protected:
         this.name = name;
     }
 
+    /**
+        Sets the default human-readable display name
+    */
+    void setDisplayName(string name) {
+        this.displayName = name;
+    }
+
+    this() {
+        this.collission = [AABB(vec3(0, 0, 0), vec3(1, 1, 1))];
+    }
+
 public:
 
+    /**
+        Sets the block's collission
+    */
+    void setCollission(AABB[] collission) {
+        this.collission = collission;
+    }
+
+    /**
+        Gets the name of the block
+    */
     string getName() {
         return this.name;
     }
 
     /**
-        Breaks block at specified location
+        Gets the human-readable display name of the block
     */
-    void breakBlockAt(World worldIn, WorldPos pos) {
-        if (Chunk chunk = worldIn.getChunkAt(pos)) chunk.setBlockAt(pos, 0);
+    string getDisplayName() {
+        return this.displayName;
+    }
+
+    /**
+        Gets the collission for the block
+    */
+    AABB[] getCollission() {
+        return collission;
+    }
+
+    /**
+        Gets the ID of the block
+    */
+    BlockRef getId() {
+        return this.id;
     }
 }
 
@@ -77,7 +127,8 @@ public:
 //
 
 private {
-    __gshared Block[uint] blocksInRegistry;
+    __gshared Block[BlockRef] blocksInRegistry;
+    __gshared BlockRef[string] blockNamesInRegistry;
 }
 
 /**
@@ -85,13 +136,14 @@ private {
 
     ID 0 is reserved for AIR blocks
 */
-void fcRegisterBlock(Block block, uint id) {
+void fcRegisterBlock(Block block, BlockRef id) {
     blocksInRegistry[id] = block;
+    blockNamesInRegistry[block.name] = id;
 }
 
 /**
     Gets block from the registry
 */
-Block fcGetBlock(uint id) {
+Block fcGetBlock(BlockRef id) {
     return id in blocksInRegistry ? blocksInRegistry[id] : null;
 }

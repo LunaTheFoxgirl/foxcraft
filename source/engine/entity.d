@@ -26,7 +26,7 @@ public:
         Position in the world
     */
     final vec3 worldPosition() {
-        return vec3(position.x, -position.y, position.z);
+        return vec3(-position.x, -position.y, -position.z);
     }
 
     /**

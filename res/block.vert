@@ -11,7 +11,7 @@ out float lightValue;
 
 void main() {
     const float curvatureStart = 128.0; 
-    const float curveDiv = 32.0; // should be 1024 for proper use
+    const float curveDiv = 32.0; // should be 32 for proper use
 
     float dist = distance(
         vec2(
@@ -29,7 +29,6 @@ void main() {
         dist / curveDiv, 
         clamp(abs(dist)/curvatureStart, 0, curvatureStart)
     );
-
 
     gl_Position = mvp * vec4(vrt.x, vrt.y-curvature, vrt.z, 1);
     texUVs = uvs;

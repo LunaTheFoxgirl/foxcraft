@@ -14,7 +14,7 @@ enum WorldHeight = 256;
 /**
     The world
 */
-World TheWorld;
+__gshared World TheWorld;
 
 /**
     Chunk position in world
@@ -52,6 +52,42 @@ struct WorldPos {
         this.y = vec.y;
         this.z = vec.z;
     }
+
+    /**
+        Returns this worldpos as a vec3i
+    */
+    vec3i toVec3i() {
+        return vec3i(x, y, z);
+    }
+
+    /**
+        Returns this worldpos as a float vec3
+    */
+    vec3 toVec3() {
+        return vec3(x, y, z);
+    }
+
+    /**
+        Returns this worldpos as a float vec3
+    */
+    vec2 toVec2() {
+        return vec2(x, z);
+    }
+
+    /**
+        Get the distance to an other WorldPos
+    */
+    int distance(WorldPos other) {
+        return cast(int)toVec2().distance(other.toVec2);
+    }
+
+    bool isInArea(WorldPos origin, int area) {
+        area /= 2;
+        return 
+            x >= origin.x-area && x < origin.x+area &&
+            y >= origin.y-area && y < origin.y+area &&
+            z >= origin.z-area && z < origin.z+area;
+    }
 }
 
 /**
@@ -60,12 +96,6 @@ struct WorldPos {
 class World {
 private:
     uint seed;
-    ReadWriteMutex chunkMutex;
-
-    /**
-        The loaded chunks in the world
-    */
-    Chunk[WorldPos] chunks;
 
 public:
 
@@ -73,50 +103,17 @@ public:
         Creates a new world
     */
     this(uint seed) {
-        chunkMutex = new ReadWriteMutex();
+        TheWorld = this;
         this.seed = seed;
         fcGameSetRelativeMouse(true);
 
         player = new PlayerEntity(this);
-        import std.random : uniform;
-        OpenSimplex2F osimplex = new OpenSimplex2F(uniform(0, ulong.max));
-        
-
-        foreach(cx; 0..32) {
-            foreach(cy; 0..32) {
-                foreach(cz; 0..32) {
-                    Chunk chunk = new Chunk(this, vec3i(cx-16, cy, cz-16));
-                    BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks;
-                    foreach(x; 0..ChunkSize) {
-                        foreach(y; 0..ChunkSize) {
-                            foreach(z; 0..ChunkSize) {
-                                double noise1 = osimplex.noise2(
-                                    cast(double)(1000+(cx*ChunkSize)+x)*0.001, 
-                                    cast(double)(1000+(cz*ChunkSize)+z)*0.001
-                                )*3;
-                                double noise2 = osimplex.noise2(
-                                    cast(double)((cx*ChunkSize)+x)/100, 
-                                    cast(double)((cz*ChunkSize)+z)/100
-                                );
-
-                                int height = cast(int)(
-                                    (256-16)+(((noise2*noise1)/2)*16)
-                                );
-                                if (x % 8 == 0 && z % 8 == 0) height += 2;
-                                height = 255;
-
-                                if ((cy*ChunkSize)+y == height) blocks[x][y][z] = 2;
-                                else if ((cy*ChunkSize)+y < height) blocks[x][y][z] = 1;
-                            }
-                        }
-                    }
-                    chunk.setChunkBlocks(blocks);
-                    this.addChunk(chunk, false);
-                }
-            }
-        }
-        this.forceMeshUpdates();
     }
+
+    /**
+        The loaded chunks in the world
+    */
+    Chunk[WorldPos] chunks;
 
     /**
         Player entity
@@ -149,6 +146,8 @@ public:
         
         // Updates player
         player.update();
+
+        ChunkProvider.update();
 
         foreach(chunk; chunks) {
             chunk.draw();

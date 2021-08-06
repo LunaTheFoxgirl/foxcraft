@@ -51,15 +51,17 @@ void fcInitEngine() {
 */
 void fcStartEngine() {
 
+    TheWorld = new World(0);
+
     MeshGenerator.start();
+    ChunkProvider.preload();
+    ChunkProvider.start();
 
     // Initialize viewport
     uint vx, vy;
     fcGameWindowSize(vx, vy);
     viewport = vec2i(vx, vy);
     glViewport(0, 0, viewport.x, viewport.y);
-
-    TheWorld = new World(0);
 
     // Game Loop
     SDL_Event event;
@@ -114,6 +116,7 @@ void fcStartEngine() {
         fcGameWindowSwap();
     }
 
+    ChunkProvider.stop();
     MeshGenerator.stop();
 }
 

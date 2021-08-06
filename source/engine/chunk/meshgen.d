@@ -83,6 +83,7 @@ struct CMView {
             Chunk chb = chunk.chunkBack;
 
             import core.atomic : atomicLoad;
+            position = vec3(chunk.worldPosition.x, chunk.worldPosition.y, chunk.worldPosition.z);
 
             this.mstore = chunk.store;
             if (chl) this.cl = chl.store;
@@ -103,6 +104,7 @@ struct CMView {
             if (chb) this.cb = chb.store;
             else if (!chb || !chb.store) hasBack = false;
     }
+    immutable(vec3) position;
 
     immutable(ChunkBlockStore)* mstore;
     immutable(ChunkBlockStore)* cl;
@@ -135,7 +137,7 @@ struct MeshGenTask {
         Returns the distance of this task to the player
     */
     float distanceToPlayer() {
-        return abs(chunk.chunk.worldPosition.distance(FcCamera.worldPosition));
+        return abs(data.position.distance(FcCamera.worldPosition));
     }
 }
 
@@ -271,17 +273,18 @@ private static:
     }
 
     void meshGenThreadFunc() {
+        import std.stdio : writeln;
+
         setMaxMailboxSize(thisTid, 0, OnCrowding.ignore);
         while (atomicLoad(shouldRun)) {
             try {
-                while (receiveTimeout(-1.msecs, (immutable(MeshGenTask)* task) {
+                while (receiveTimeout(0.msecs, (immutable(MeshGenTask)* task) {
                     taskQueue ~= cast(MeshGenTask*)task;
-
                 })) { }
 
                 if (taskQueue.length > 0) {
-                    import std.math : cmp;
-                    taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
+                    // import std.math : cmp;
+                    // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
 
                     while (taskQueue.length > 0 && atomicLoad(shouldRun)) {
 
@@ -296,7 +299,8 @@ private static:
                         send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
                     }
                 }
-                Thread.sleep(10.msecs);
+
+                Thread.sleep(100.msecs);
             } catch(Exception ex) {
                 import std.stdio : writeln;
                 writeln("[ERROR] ChunkMesher: ", ex.msg);
@@ -322,8 +326,11 @@ public static:
 
     void update() {
         size_t counter = 0;
-        enum COUNTER_MAX_FRAME = 100;
+        enum COUNTER_MAX_FRAME = 2048;
         while(counter < COUNTER_MAX_FRAME && receiveTimeout(-1.msecs, (immutable(MeshGenResponse)* response) {
+            // Return if buffer is null
+            if (response.chunk.buffer is null) return;
+
             ChunkMesh rchunk = cast(ChunkMesh)response.chunk;
             rchunk.buffer.pass(new immutable(CMDataArr)(response.data));
             rchunk.buffer.upload();
@@ -334,6 +341,7 @@ public static:
         enqueues the specificed mesh generator task
     */
     void enqueue(immutable(MeshGenTask)* task) {
+        if (task.chunk.buffer is null) return; // Can't enqueue a dead buffer
         send(meshGeneratorThread, task);
     }
 }
