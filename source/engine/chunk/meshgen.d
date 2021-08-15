@@ -77,8 +77,6 @@ struct CMView {
     this(ref Chunk chunk) {
             Chunk chl = chunk.chunkLeft;
             Chunk chr = chunk.chunkRight;
-            Chunk chu = chunk.chunkTop;
-            Chunk chd = chunk.chunkBottom;
             Chunk chf = chunk.chunkFront;
             Chunk chb = chunk.chunkBack;
 
@@ -91,12 +89,6 @@ struct CMView {
 
             if (chr) this.cr = chr.store;
             else if (!chr || !chr.store) hasRight = false;
-
-            if (chu) this.cu = chu.store;
-            else if (!chu || !chu.store) hasUp = false;
-
-            if (chd) this.cd = chd.store;
-            else if (!chd || !chd.store) hasDown = false;
 
             if (chf) this.cf = chf.store;
             else if (!chf || !chf.store) hasFront = false;
@@ -113,12 +105,6 @@ struct CMView {
     immutable(ChunkBlockStore)* cr;
     bool hasRight = true;
 
-    immutable(ChunkBlockStore)* cu;
-    bool hasUp = true;
-
-    immutable(ChunkBlockStore)* cd;
-    bool hasDown = true;
-
     immutable(ChunkBlockStore)* cf;
     bool hasFront = true;
 
@@ -130,7 +116,7 @@ struct CMView {
     Mesh generation task
 */
 struct MeshGenTask {
-    ChunkMesh chunk;
+    ChunkVertexBuffer* buffer;
     CMView data;
 
     /**
@@ -145,7 +131,7 @@ struct MeshGenTask {
     Mesh generation task return data
 */
 struct MeshGenResponse {
-    ChunkMesh chunk;
+    ChunkVertexBuffer* buffer;
     immutable(CMData[]) data;
 }
 
@@ -154,13 +140,11 @@ struct MeshGenResponse {
 */
 class MeshGenerator {
 private static:
-    __gshared bool shouldRun;
-    __gshared MeshGenTask*[] taskQueue;
 
     CMData[] generateMesh(CMView data) {
         CMData[] bufferToWrite;
 
-        for(int y; y < ChunkSize; y++) {
+        for(int y; y < ChunkHeight; y++) {
             for(int z; z < ChunkSize; z++) {
                 for(int x; x < ChunkSize; x++) {
 
@@ -175,11 +159,11 @@ private static:
                     bool blockFreeLeft =    (x > 0              && data.mstore.blocks[x-1][y][z] == 0) || (x == 0 && data.hasLeft && data.cl.blocks[ChunkSize-1][y][z] == 0)      || (!data.hasLeft && x == 0);
                     bool blockFreeRight =   (x < ChunkSize-1    && data.mstore.blocks[x+1][y][z] == 0) || (x == ChunkSize-1 && data.hasRight && data.cr.blocks[0][y][z] == 0)     || (!data.hasRight && x == ChunkSize-1);
 
-                    bool blockFreeBottom =  (y > 0              && data.mstore.blocks[x][y-1][z] == 0) || (y == 0 && data.hasDown && data.cd.blocks[x][ChunkSize-1][z] == 0)      || (!data.hasDown && y == 0);
-                    bool blockFreeTop =     (y < ChunkSize-1    && data.mstore.blocks[x][y+1][z] == 0) || (y == ChunkSize-1 && data.hasUp && data.cu.blocks[x][0][z] == 0)        || (!data.hasUp && y == ChunkSize-1);
-
                     bool blockFreeBack =    (z > 0              && data.mstore.blocks[x][y][z-1] == 0) || (z == 0 && data.hasBack && data.cb.blocks[x][y][ChunkSize-1] == 0)      || (!data.hasBack && z == 0);
                     bool blockFreeFront =   (z < ChunkSize-1    && data.mstore.blocks[x][y][z+1] == 0) || (z == ChunkSize-1 && data.hasFront && data.cf.blocks[x][y][0] == 0)    || (!data.hasFront && z == ChunkSize-1);
+
+                    bool blockFreeBottom =  (y > 0              && data.mstore.blocks[x][y-1][z] == 0) || y == 0;
+                    bool blockFreeTop =     (y < ChunkHeight-1    && data.mstore.blocks[x][y+1][z] == 0) || y == ChunkHeight-1;
 
                     vec3 cpos = vec3(x, y, z);
 
@@ -272,34 +256,43 @@ private static:
         return bufferToWrite;
     }
 
+    __gshared bool shouldRun;
     void meshGenThreadFunc() {
         import std.stdio : writeln;
+        import core.memory : GC;
 
         setMaxMailboxSize(thisTid, 0, OnCrowding.ignore);
+        auto owner = ownerTid;
+        MeshGenTask*[] taskQueue;
         while (atomicLoad(shouldRun)) {
             try {
-                while (atomicLoad(shouldRun) && receiveTimeout(-1.msecs, (immutable(MeshGenTask)* task) {
-                    // taskQueue ~= cast(MeshGenTask*)task;
-                    
-                    // Get the task and remove it from the queue
-                    MeshGenTask* ctask = cast(MeshGenTask*)task;
-
-                    // Generate a mesh for the task
-                    auto data = generateMesh(ctask.data);
-
-                    // Send it back to our main thread so that it can be sent on to OpenGL
-                    send(ownerTid, cast(immutable(MeshGenResponse)*)new MeshGenResponse(ctask.chunk, data.idup));
+                while (atomicLoad(shouldRun) && receiveTimeout(100.msecs, (immutable(MeshGenTask)* task) {
+                    taskQueue ~= cast(MeshGenTask*)task;
                 })) { }
 
-                // if (taskQueue.length > 0) {
-                //     // import std.math : cmp;
-                //     // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
+                if (taskQueue.length > 0) {
+                    // import std.math : cmp;
+                    // taskQueue.sort!((a, b) => cmp(a.distanceToPlayer(), b.distanceToPlayer()) < 0);
 
-                //     while (taskQueue.length > 0 && ) {
-                //     }
-                // }
+                    import std.parallelism : parallel;
 
-                Thread.sleep(100.msecs);
+                    // TODO: This is using a lot of memory, make it not do that
+                    //for (size_t i; i < taskQueue.length; i++) {
+                    foreach(ctask; parallel(taskQueue)) {
+                        if (!atomicLoad(shouldRun)) continue;
+                        // Generate a mesh for the task
+
+                        // Send it back to our main thread so that it can be sent on to OpenGL
+                        send(
+                            owner, 
+                            cast(immutable(MeshGenResponse)*)new MeshGenResponse(
+                                ctask.buffer, 
+                                cast(immutable(CMData[]))generateMesh(ctask.data)
+                            )
+                        );
+                    }
+                    taskQueue.length = 0;
+                }
             } catch(Exception ex) {
                 import std.stdio : writeln;
                 writeln("[ERROR] ChunkMesher: ", ex.msg);
@@ -323,16 +316,16 @@ public static:
         atomicStore(shouldRun, false);
     }
 
+    size_t totalCounter;
     void update() {
         size_t counter = 0;
-        enum COUNTER_MAX_FRAME = 2048;
+        enum COUNTER_MAX_FRAME = 1024;
         while(counter < COUNTER_MAX_FRAME && receiveTimeout(-1.msecs, (immutable(MeshGenResponse)* response) {
-            // Return if buffer is null
-            if (response.chunk.buffer is null) return;
 
-            ChunkMesh rchunk = cast(ChunkMesh)response.chunk;
-            rchunk.buffer.pass(new immutable(CMDataArr)(response.data));
-            rchunk.buffer.upload();
+            // Return if buffer is null
+            if (response.buffer is null) return;
+
+            (cast(ChunkVertexBuffer)*response.buffer).upload(response.data);
         })) counter++;
     }
 
@@ -340,7 +333,7 @@ public static:
         enqueues the specificed mesh generator task
     */
     void enqueue(immutable(MeshGenTask)* task, bool highPriority = false) {
-        if (task.chunk.buffer is null) return; // Can't enqueue a dead buffer
+        if (task.buffer is null) return; // Can't enqueue a dead buffer
         if (highPriority) prioritySend(meshGeneratorThread, task);
         else send(meshGeneratorThread, task);
     }

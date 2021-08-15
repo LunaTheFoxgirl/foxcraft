@@ -54,8 +54,8 @@ void fcStartEngine() {
     TheWorld = new World(0);
 
     MeshGenerator.start();
-    ChunkProvider.preload();
     ChunkProvider.start();
+    ChunkProvider.preload();
 
     // Initialize viewport
     uint vx, vy;
@@ -69,6 +69,7 @@ void fcStartEngine() {
         
         lastFrameTime = nowFrameTime;
         nowFrameTime = SDL_GetPerformanceCounter();
+        deltaTime = (nowFrameTime-lastFrameTime)*1000 / cast(double)SDL_GetPerformanceFrequency();
         fcInputFlush();
 
         // Update event loop
@@ -114,9 +115,24 @@ void fcStartEngine() {
 
         // End loop
         fcGameWindowSwap();
+
+        import core.memory : GC;
+        import std.format : format;
+        auto stats = GC.stats;
+        fcGameWindowSetTitle(
+            "FoxCraft - %smb used, %smb free, %smb total (main thread), %s chunks loaded ー %sms delta".format(
+                stats.usedSize/1_000_000, 
+                stats.freeSize/1_000_000, 
+                (stats.freeSize+stats.usedSize)/1_000_000,
+                TheWorld.chunks.length,
+                cast(int)fcDeltaTime()
+            )
+        );
+
+        // Apparently the GC doesn't collect itself
+        GC.collect();
     }
 
-    ChunkProvider.stop();
     MeshGenerator.stop();
 }
 

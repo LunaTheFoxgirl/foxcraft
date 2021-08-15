@@ -30,25 +30,15 @@ struct CMData {
 }
 
 /**
-    Container for CMData vertices
-*/
-struct CMDataArr {
-    /**
-        The vertices of the buffer
-    */
-    CMData[] vertices;
-}
-
-/**
     A mesher which generates meshes for a chunk
 */
 class ChunkVertexBuffer {
 public:
 
     /**
-        The vertices in this buffer
+        amount of elements in buffer
     */
-    immutable(CMDataArr)* data;
+    size_t count;
 
     /**
         The VBO
@@ -56,7 +46,10 @@ public:
     GLuint vbo;
 
     ~this() {
+        //import std.stdio;
+        //writeln("Deleting buffer ", vbo, "...");
         glDeleteBuffers(1, &vbo);
+        vbo = 0;
     }
 
     /**
@@ -65,43 +58,28 @@ public:
     this() {    
         glGenBuffers(1, &vbo);
     }
-    
-
-    /**
-        Pass an immutable vertex data buffer to this buffer, swapping it
-    */
-    void pass(immutable(CMDataArr)* data) {
-        atomicExchange(&this.data, data);
-    }
 
     /**
         Upload vertex data to the GPU
     */
-    void upload() {
-        if (data is null) return;
-        auto idata = atomicLoad(data);
+    void upload(immutable(CMData[]) data) {
+        if (data is null) {
+            count = 0;
+            return;
+        }
+        atomicStore(count, data.length);
 
         // No need to upload empty buffers.
-        if (idata.vertices.length == 0) return;
+        if (count == 0) return;
+        if (vbo == 0) return;
 
         glBindVertexArray(chunkVAO);
         glBindBuffer(GL_ARRAY_BUFFER, this.vbo);
-        glBufferData(GL_ARRAY_BUFFER, CMData.sizeof*idata.vertices.length, idata.vertices.ptr, GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, CMData.sizeof*data.length, data.ptr, GL_DYNAMIC_DRAW);
     }
 
     size_t length() {
-        auto idata = atomicLoad(data);
-        return idata !is null ? idata.vertices.length : 0;
-    }
-
-    override
-    string toString() {
-        import std.format : format;
-        string mstr = "";
-        foreach(CMData data; data.vertices) {
-            mstr ~= "v %f %f %f\n".format(data.vertex.x, data.vertex.y, data.vertex.z);
-        }
-        return mstr;
+        return atomicLoad(count);
     }
 }
 
@@ -124,10 +102,6 @@ public:
     Chunk chunk;
     ChunkVertexBuffer buffer;
 
-    ~this() {
-        destroy(buffer);
-    }
-
     this(Chunk chunk) {
         this.chunk = chunk;
         this.buffer = new ChunkVertexBuffer();
@@ -140,7 +114,7 @@ public:
     */
     void regenerate(bool highPriority = false) {
         MeshGenerator.enqueue(new immutable(MeshGenTask)(
-            cast(immutable(ChunkMesh))this, 
+            cast(immutable(ChunkVertexBuffer)*)&buffer, 
             cast(immutable(CMView))CMView(chunk)
         ), highPriority);
     }
@@ -151,6 +125,7 @@ public:
     void draw() {
         size_t len = buffer.length;
         if (len == 0) return;
+        if (buffer.vbo == 0) return;
 
         glBindVertexArray(chunkVAO);
 

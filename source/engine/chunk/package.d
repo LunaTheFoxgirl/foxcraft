@@ -11,14 +11,9 @@ public import engine.chunk.chunkprovider;
 enum ChunkSize = 16;
 
 /**
-    The square size of a chunk
+    The height of a chunk
 */
-enum ChunkSizeSquared = ChunkSize*ChunkSize;
-
-/**
-    The cube size of a chunk
-*/
-enum ChunkSizeCubed = ChunkSizeSquared*ChunkSizeSquared;
+enum ChunkHeight = 512;
 
 /**
     Internal store for blocks that's atomically swappable
@@ -28,7 +23,53 @@ struct ChunkBlockStore {
     /**
         A list of blocks in the world
     */
-    BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks;
+    BlockRef[ChunkSize][ChunkHeight][ChunkSize] blocks;
+}
+
+/**
+    Chunk position
+*/
+struct ChunkPos {
+    /**
+        X coordinate of chunk
+    */
+    int x;
+
+    /**
+        Z coordinate of chunk
+    */
+    int z;
+
+    /**
+        Returns the chunk as a vec2i
+    */
+    vec2i toVec2i() {
+        return vec2i(x, z);
+    }
+
+    /**
+        Returns the chunk as a vec2
+    */
+    vec2 toVec2() {
+        return vec2(x, z);
+    }
+
+    /**
+        Get the distance to an other WorldPos
+    */
+    int distance(WorldPos other) {
+        return cast(int)toVec2().distance(other.toVec2);
+    }
+
+    /**
+        Gets whether a ChunkPos is in this area
+    */
+    bool isInArea(ChunkPos origin, int area) {
+        area /= 2;
+        return 
+            x >= origin.x-area && x < origin.x+area &&
+            z >= origin.z-area && z < origin.z+area;
+    }
 }
 
 /**
@@ -57,7 +98,7 @@ package(engine):
     */
     void _storeUpdate(immutable(ChunkBlockStore)* newStore) {
         import core.atomic : atomicExchange;
-        cast(void)atomicExchange(&store, newStore);
+        atomicExchange(&store, newStore);
     }
 
     bool meshInvalid;
@@ -70,37 +111,38 @@ package(engine):
 
 public:
 
+    ~this() {
+        destroy!false(mesh);
+        destroy!false(store);
+    }
+
     /**
         Position of the chunk in the world
     */
-    vec3i position;
+    ChunkPos position;
 
     /**
         Gets the world position of the chunk
     */
     vec3 worldPosition() {
-        return vec3(position.x*ChunkSize, position.y*ChunkSize, position.z*ChunkSize);
+        return vec3(position.x*ChunkSize, 0, position.z*ChunkSize);
     }
 
     /**
         Gets the world position of the chunk
     */
     vec3 worldPositionCenter() {
-        return vec3((position.x+8)*ChunkSize, (position.y+8)*ChunkSize, (position.z+8)*ChunkSize);
-    }
-
-    ~this() {
-        destroy(mesh);
+        return vec3((position.x+8)*ChunkSize, ChunkHeight/2, (position.z+8)*ChunkSize);
     }
 
     /**
         Initializes a chunk
     */
-    this(World world, vec3i position) {
+    this(World world, ChunkPos position) {
         this.world = world;
         this.position = position;
         this.mesh = new ChunkMesh(this);
-        BlockRef[ChunkSize][ChunkSize][ChunkSize] chunkData = new BlockRef[ChunkSize][ChunkSize][ChunkSize];
+        BlockRef[ChunkSize][ChunkHeight][ChunkSize] chunkData;
         store = new ChunkBlockStore(chunkData);
     }
 
@@ -108,14 +150,14 @@ public:
     /**
         Initializes a chunk
     */
-    this(World world, WorldPos position) {
-        this(world, position.toVec3i());
+    this(World world, vec2i position) {
+        this(world, ChunkPos(position.x, position.y));
     }
 
     /**
         Loads blocks
     */
-    void setChunkBlocks(BlockRef[ChunkSize][ChunkSize][ChunkSize] blocks) {
+    void setChunkBlocks(BlockRef[ChunkSize][ChunkHeight][ChunkSize] blocks) {
         this._storeUpdate(new ChunkBlockStore(blocks));
     }
 
@@ -135,14 +177,10 @@ public:
             // Update surrounding chunks
             Chunk leftChunk = this.chunkLeft;
             Chunk rightChunk = this.chunkRight;
-            Chunk topChunk = this.chunkTop;
-            Chunk bottomChunk = this.chunkBottom;
             Chunk frontChunk = this.chunkFront;
             Chunk backChunk = this.chunkBack;
             if (leftChunk) leftChunk.invalidateMesh(false, highPriority);
             if (rightChunk) rightChunk.invalidateMesh(false, highPriority);
-            if (topChunk) topChunk.invalidateMesh(false, highPriority);
-            if (bottomChunk) bottomChunk.invalidateMesh(false, highPriority);
             if (frontChunk) frontChunk.invalidateMesh(false, highPriority);
             if (backChunk) backChunk.invalidateMesh(false, highPriority);
         }
@@ -156,14 +194,10 @@ public:
         // Update surrounding chunks
         Chunk leftChunk = this.chunkLeft;
         Chunk rightChunk = this.chunkRight;
-        Chunk topChunk = this.chunkTop;
-        Chunk bottomChunk = this.chunkBottom;
         Chunk frontChunk = this.chunkFront;
         Chunk backChunk = this.chunkBack;
         if (leftChunk) leftChunk.invalidateMesh(false);
         if (rightChunk) rightChunk.invalidateMesh(false);
-        if (topChunk) topChunk.invalidateMesh(false);
-        if (bottomChunk) bottomChunk.invalidateMesh(false);
         if (frontChunk) frontChunk.invalidateMesh(false);
         if (backChunk) backChunk.invalidateMesh(false);
     }
@@ -186,8 +220,7 @@ public:
     bool hasBlockAt(WorldPos blockPos) {
         if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
         else blockPos.x = blockPos.x%ChunkSize;
-        if (blockPos.y <= 0) blockPos.y = (ChunkSize-1)-(abs(blockPos.y)%ChunkSize);
-        else blockPos.y = blockPos.y%ChunkSize;
+        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
         if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
         else blockPos.z = blockPos.z%ChunkSize;
         return this.store.blocks[blockPos.x][blockPos.y][blockPos.z] > 0;
@@ -199,35 +232,16 @@ public:
     void setBlockAt(WorldPos blockPos, BlockRef block) {
         if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
         else blockPos.x = blockPos.x%ChunkSize;
-        if (blockPos.y <= 0) blockPos.y = (ChunkSize-1)-(abs(blockPos.y)%ChunkSize);
-        else blockPos.y = blockPos.y%ChunkSize;
+        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
         if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
         else blockPos.z = blockPos.z%ChunkSize;
 
         auto store = *store;
-        BlockRef[ChunkSize][ChunkSize][ChunkSize] oldBlockList = store.blocks.dup;
+        BlockRef[ChunkSize][ChunkHeight][ChunkSize] oldBlockList = store.blocks.dup;
         oldBlockList[blockPos.x][blockPos.y][blockPos.z] = block;
 
         this._storeUpdate(new ChunkBlockStore(oldBlockList));
         this.invalidateMesh(true, true);
-    }
-
-    /**
-        Gets chunk over
-
-        Returns null if chunk isn't found
-    */
-    Chunk chunkTop() {
-        return world.getChunkAt(WorldPos(position.x, position.y+1, position.z));
-    }
-
-    /**
-        Gets chunk under
-
-        Returns null if chunk isn't found
-    */
-    Chunk chunkBottom() {
-        return world.getChunkAt(WorldPos(position.x, position.y-1, position.z));
     }
 
     /**
@@ -236,7 +250,7 @@ public:
         Returns null if chunk isn't found
     */
     Chunk chunkFront() {
-        return world.getChunkAt(WorldPos(position.x, position.y, position.z+1));
+        return world.getChunkAt(ChunkPos(position.x, position.z+1));
     }
 
     /**
@@ -245,7 +259,7 @@ public:
         Returns null if chunk isn't found
     */
     Chunk chunkBack() {
-        return world.getChunkAt(WorldPos(position.x, position.y, position.z-1));
+        return world.getChunkAt(ChunkPos(position.x, position.z-1));
     }
 
     /**
@@ -254,7 +268,7 @@ public:
         Returns null if chunk isn't found
     */
     Chunk chunkLeft() {
-        return world.getChunkAt(WorldPos(position.x-1, position.y, position.z));
+        return world.getChunkAt(ChunkPos(position.x-1, position.z));
     }
 
     /**
@@ -263,7 +277,7 @@ public:
         Returns null if chunk isn't found
     */
     Chunk chunkRight() {
-        return world.getChunkAt(WorldPos(position.x+1, position.y, position.z));
+        return world.getChunkAt(ChunkPos(position.x+1, position.z));
     }
 
     World getWorld() {

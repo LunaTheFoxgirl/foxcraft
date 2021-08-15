@@ -14,7 +14,7 @@ enum WorldHeight = 256;
 /**
     The world
 */
-__gshared World TheWorld;
+World TheWorld;
 
 /**
     Chunk position in world
@@ -113,7 +113,7 @@ public:
     /**
         The loaded chunks in the world
     */
-    Chunk[WorldPos] chunks;
+    Chunk[ChunkPos] chunks;
 
     /**
         Player entity
@@ -134,6 +134,7 @@ public:
         Force mesh updates to occur
     */
     void forceMeshUpdates() {
+        chunks.rehash();
         foreach(chunk; chunks) {
             chunk.invalidateMesh(false);
         }
@@ -163,16 +164,32 @@ public:
         Adds a chunk in to the world
     */
     void addChunk(Chunk chunk, bool invalidate = true) {
-        WorldPos cPos = WorldPos(chunk.position);
-        chunks[cPos] = chunk;
-        if (invalidate) chunks[cPos].invalidateMesh();
+        chunks[chunk.position] = chunk;
+        chunks.rehash();
+        if (invalidate) chunks[chunk.position].invalidateMesh();
+    }
+
+    /**
+        Removes a chunk from the world
+    */
+    void removeChunk(ChunkPos position) {
+        destroy!false(chunks[position]);
+        TheWorld.chunks.remove(position);
+    }
+
+    void clearChunks() {
+        import core.memory : GC;
+        foreach(pos; chunks.keys) {
+            removeChunk(pos);
+        }
+        chunks.rehash();
     }
 
     /**
         Gets the block at the specified position
     */
     Block getBlockAt(WorldPos position) {
-        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
 
         // Early return, no chunk found
         if (chunkPos !in chunks) return null;
@@ -180,8 +197,7 @@ public:
         WorldPos blockPos;
         if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
         else blockPos.x = position.x&ChunkSize-1;
-        if (position.y < 0) blockPos.y = abs(position.y)%ChunkSize-1;
-        else blockPos.y = position.y&ChunkSize-1;
+        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
         if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
         else blockPos.z = position.z&ChunkSize-1;
 
@@ -195,7 +211,7 @@ public:
         Gets the block at the specified position
     */
     void setBlockAt(WorldPos position, BlockRef block) {
-        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
 
         // Early return, no chunk found
         if (chunkPos !in chunks) return;
@@ -203,8 +219,7 @@ public:
         WorldPos blockPos;
         if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
         else blockPos.x = position.x&ChunkSize-1;
-        if (position.y < 0) blockPos.y = abs(position.y)%ChunkSize-1;
-        else blockPos.y = position.y&ChunkSize-1;
+        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
         if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
         else blockPos.z = position.z&ChunkSize-1;
 
@@ -218,15 +233,15 @@ public:
         Gets the chunk at the specified position
     */
     Chunk getChunkAtWorldPos(WorldPos position) {
-        WorldPos chunkPos = WorldPos(position.x/ChunkSize, position.y/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
         return chunkPos in chunks ? chunks[chunkPos] : null;
     }
 
     /**
         Gets the chunk at the specified position
     */
-    Chunk getChunkAt(WorldPos position) {
-        WorldPos chunkPos = WorldPos(position.x, position.y, position.z);
+    Chunk getChunkAt(ChunkPos position) {
+        ChunkPos chunkPos = ChunkPos(position.x, position.z);
         return chunkPos in chunks ? chunks[chunkPos] : null;
     }
 }

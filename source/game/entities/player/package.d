@@ -82,6 +82,21 @@ public:
 
         if (lstate !is null) {
 
+            if (kstate.isKeyDown(Keys.R) && lstate.isKeyUp(Keys.R)) {
+                
+                TheWorld.forceMeshUpdates();
+                //this.position = vec3(0, -256, 0);
+            }
+
+            if (kstate.isKeyDown(Keys.Q) && lstate.isKeyUp(Keys.Q)) {
+                import engine.chunk.meshgen : MeshGenerator;
+                TheWorld.clearChunks();
+            }
+
+            if (kstate.isKeyDown(Keys.T) && lstate.isKeyUp(Keys.T)) {
+                ChunkProvider.preload();
+            }
+
             if (lookingAt && kstate.isKeyDown(Keys.E) && lstate.isKeyUp(Keys.E)) {
                 if (placeId == 0) {
                     TheWorld.setBlockAt(*lookingAt, 0);

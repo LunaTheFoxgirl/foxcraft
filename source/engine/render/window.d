@@ -71,13 +71,13 @@ void fcGameWindowCreate(string title) {
         fcGameWindow,
         SDL_GL_CreateContext(fcGameWindow)
     );
-
-    // Sets VSync On
-    SDL_GL_SetSwapInterval(1);
     
 
     // Loads OpenGL functions
     fcLoadGL();
+
+    // Sets VSync On
+    SDL_GL_SetSwapInterval(-1);
 
     // glEnable(GL_DEBUG_OUTPUT);
     // glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
