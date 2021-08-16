@@ -224,6 +224,13 @@ public:
     }
 
     /**
+        Draws the chunk (transparent pass)
+    */
+    void drawTransparent() {
+        mesh.drawtr();
+    }
+
+    /**
         Gets whether there's a block at the specified location
     */
     bool hasBlockAt(WorldPos blockPos) {

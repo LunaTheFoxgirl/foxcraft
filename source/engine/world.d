@@ -165,9 +165,9 @@ public:
 
         ChunkProvider.update();
 
-        foreach(chunk; chunks) {
-            chunk.draw();
-        }
+        foreach(chunk; chunks) chunk.draw();
+        foreach(chunk; chunks) chunk.drawTransparent();
+        
 
         // Updates entities
         foreach(entity; entities) {

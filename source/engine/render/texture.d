@@ -116,6 +116,16 @@ public:
     void save(string file) {
         write_image(file, this.width, this.height, this.data, 4);
     }
+
+    /**
+        Gets whether the image is transparent
+    */
+    bool isTransparent() {
+        foreach(i; 0..data.length/4) {
+            if (data[3+(i*4)] < 255) return true;
+        }
+        return false;
+    }
 }
 
 /**
@@ -126,9 +136,17 @@ private:
     GLuint id;
     int width_;
     int height_;
+    bool hasTransparency_;
 
     GLuint colorMode;
     int alignment;
+
+    bool scanTransparency(ubyte[] data) {
+        foreach(i; 0..data.length/4) {
+            if (data[i*4] < 255) return true;
+        }
+        return false;
+    }
 
 public:
 
@@ -182,6 +200,9 @@ public:
         // Generate OpenGL texture
         glGenTextures(1, &id);
         this.setData(data);
+        
+        if (mode == GL_RGBA) this.hasTransparency_ = this.scanTransparency(data);
+        else this.hasTransparency_ = false;
 
         // Set default filtering and wrapping
         this.setFiltering(Filtering.Point);
@@ -244,6 +265,9 @@ public:
         glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
         glTexImage2D(GL_TEXTURE_2D, 0, colorMode, width_, height_, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.ptr);
         glGenerateMipmap(GL_TEXTURE_2D);
+        
+        if (colorMode == GL_RGBA) this.hasTransparency_ = this.scanTransparency(data);
+        else this.hasTransparency_ = false;
     }
 
     /**
@@ -260,6 +284,9 @@ public:
         glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
         glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, this.colorMode, GL_UNSIGNED_BYTE, data.ptr);
         glGenerateMipmap(GL_TEXTURE_2D);
+        
+        if (colorMode == GL_RGBA) this.hasTransparency_ = this.scanTransparency(data);
+        else this.hasTransparency_ = false;
     }
 
     /**
@@ -297,6 +324,13 @@ public:
     */
     GLuint getTextureId() {
         return id;
+    }
+
+    /**
+        Gets whether the texture has transparency
+    */
+    bool hasTransparency() {
+        return hasTransparency_;
     }
 }
 

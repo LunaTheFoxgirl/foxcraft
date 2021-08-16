@@ -156,8 +156,9 @@ public static:
                 );
 
                 foreach(y; 0..ChunkHeight) {
-                    if (y == height) storage.blocks[x][y][z] = 2;
-                    else if (y < height) storage.blocks[x][y][z] = 1;
+                    if (y < height-4) storage.blocks[x][y][z] = 1;
+                    else if (y < height) storage.blocks[x][y][z] = 2;
+                    else if (y == height) storage.blocks[x][y][z] = 3;
                 }
             }
         }

@@ -117,6 +117,7 @@ struct CMView {
 */
 struct MeshGenTask {
     ChunkVertexBuffer* buffer;
+    ChunkVertexBuffer* trbuffer;
     CMView data;
 
     /**
@@ -132,7 +133,9 @@ struct MeshGenTask {
 */
 struct MeshGenResponse {
     ChunkVertexBuffer* buffer;
+    ChunkVertexBuffer* trbuffer;
     immutable(CMData[]) data;
+    immutable(CMData[]) trdata;
 }
 
 /**
@@ -141,8 +144,9 @@ struct MeshGenResponse {
 class MeshGenerator {
 private static:
 
-    CMData[] generateMesh(CMView data) {
+    CMData[][2] generateMesh(CMView data) {
         CMData[] bufferToWrite;
+        CMData[] tbufferToWrite;
 
         for(int y; y < ChunkHeight; y++) {
             for(int z; z < ChunkSize; z++) {
@@ -156,22 +160,80 @@ private static:
                     // Skip blocks with invalid IDs; TODO: make those blocks a special placeholder block
                     if (block is null) continue;
 
-                    bool blockFreeLeft =    (x > 0              && data.mstore.blocks[x-1][y][z] == 0) || (x == 0 && data.hasLeft && data.cl.blocks[ChunkSize-1][y][z] == 0)      || (!data.hasLeft && x == 0);
-                    bool blockFreeRight =   (x < ChunkSize-1    && data.mstore.blocks[x+1][y][z] == 0) || (x == ChunkSize-1 && data.hasRight && data.cr.blocks[0][y][z] == 0)     || (!data.hasRight && x == ChunkSize-1);
+                    bool blockTr = block.isTransparent;
 
-                    bool blockFreeBack =    (z > 0              && data.mstore.blocks[x][y][z-1] == 0) || (z == 0 && data.hasBack && data.cb.blocks[x][y][ChunkSize-1] == 0)      || (!data.hasBack && z == 0);
-                    bool blockFreeFront =   (z < ChunkSize-1    && data.mstore.blocks[x][y][z+1] == 0) || (z == ChunkSize-1 && data.hasFront && data.cf.blocks[x][y][0] == 0)    || (!data.hasFront && z == ChunkSize-1);
+                    bool blockFreeLeft =    
+                        (x > 0 && (
+                            data.mstore.blocks[x-1][y][z] == 0 ||
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x-1][y][z]).isTransparent)
+                        )) || 
+                        (x == 0 && data.hasLeft && (
+                            data.cl.blocks[ChunkSize-1][y][z] == 0 ||
+                            (!blockTr && fcGetBlock(data.cl.blocks[ChunkSize-1][y][z]).isTransparent)
+                        )) || 
+                        (!data.hasLeft && x == 0);
 
-                    bool blockFreeBottom =  (y > 0              && data.mstore.blocks[x][y-1][z] == 0) || y == 0;
-                    bool blockFreeTop =     (y < ChunkHeight-1    && data.mstore.blocks[x][y+1][z] == 0) || y == ChunkHeight-1;
+                    bool blockFreeRight =   
+                        (x < ChunkSize-1 && (
+                            data.mstore.blocks[x+1][y][z] == 0 ||
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x+1][y][z]).isTransparent)
+                        )) || 
+                        (x == ChunkSize-1 && data.hasRight && (
+                            data.cr.blocks[0][y][z] == 0 ||
+                            (!blockTr && fcGetBlock(data.cr.blocks[0][y][z]).isTransparent)
+                        )) || 
+                        (!data.hasRight && x == ChunkSize-1);
+
+                    bool blockFreeBack =    
+                        (z > 0  && (
+                            data.mstore.blocks[x][y][z-1] == 0 ||
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x][y][z-1]).isTransparent)
+                        )) || 
+                        (z == 0 && data.hasBack && (
+                            data.cb.blocks[x][y][ChunkSize-1] == 0 ||
+                            (!blockTr && fcGetBlock(data.cb.blocks[x][y][ChunkSize-1]).isTransparent)
+                        )) || 
+                        (!data.hasBack && z == 0);
+                    
+                    bool blockFreeFront = 
+                        (z < ChunkSize-1 && (
+                            data.mstore.blocks[x][y][z+1] == 0 ||
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x][y][z+1]).isTransparent)
+                        )) || 
+                        (z == ChunkSize-1 && data.hasFront && (
+                            data.cf.blocks[x][y][0] == 0 ||
+                            (!blockTr && fcGetBlock(data.cf.blocks[x][y][0]).isTransparent)
+                        )) || 
+                        (!data.hasFront && z == ChunkSize-1);
+
+                    bool blockFreeBottom = 
+                        (y > 0 && (
+                            data.mstore.blocks[x][y-1][z] == 0 || 
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x][y-1][z]).isTransparent)
+                        )) || 
+                        y == 0;
+                    
+                    bool blockFreeTop =     
+                        (y < ChunkHeight-1 && (
+                            data.mstore.blocks[x][y+1][z] == 0 || 
+                            (!blockTr && fcGetBlock(data.mstore.blocks[x][y+1][z]).isTransparent)
+                        )) || 
+                        y == ChunkHeight-1;
 
                     vec3 cpos = vec3(x, y, z);
 
                     // Top cap
                     if (blockFreeTop) {
                         vec4 uvs = fcAtlasGet(block.textures[2]);
-
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[0], vec2(uvs.x, uvs.y), 1.0),
+                            CMData(cpos+voxelVerts[1], vec2(uvs.x, uvs.w), 1.0),
+                            CMData(cpos+voxelVerts[2], vec2(uvs.z, uvs.y), 1.0),
+                            CMData(cpos+voxelVerts[3], vec2(uvs.z, uvs.y), 1.0),
+                            CMData(cpos+voxelVerts[4], vec2(uvs.x, uvs.w), 1.0),
+                            CMData(cpos+voxelVerts[5], vec2(uvs.z, uvs.w), 1.0),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[0], vec2(uvs.x, uvs.y), 1.0),
                             CMData(cpos+voxelVerts[1], vec2(uvs.x, uvs.w), 1.0),
                             CMData(cpos+voxelVerts[2], vec2(uvs.z, uvs.y), 1.0),
@@ -185,7 +247,15 @@ private static:
                     // Bottom cap
                     if (blockFreeBottom) {
                         vec4 uvs = fcAtlasGet(block.textures[3]);
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[6],  vec2(uvs.x, uvs.y), 0.3),
+                            CMData(cpos+voxelVerts[7],  vec2(uvs.x, uvs.w), 0.3),
+                            CMData(cpos+voxelVerts[8],  vec2(uvs.z, uvs.y), 0.3),
+                            CMData(cpos+voxelVerts[9],  vec2(uvs.z, uvs.y), 0.3),
+                            CMData(cpos+voxelVerts[10], vec2(uvs.x, uvs.w), 0.3),
+                            CMData(cpos+voxelVerts[11], vec2(uvs.z, uvs.w), 0.3),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[6],  vec2(uvs.x, uvs.y), 0.3),
                             CMData(cpos+voxelVerts[7],  vec2(uvs.x, uvs.w), 0.3),
                             CMData(cpos+voxelVerts[8],  vec2(uvs.z, uvs.y), 0.3),
@@ -199,7 +269,15 @@ private static:
                     // Back cap
                     if (blockFreeBack) {
                         vec4 uvs = fcAtlasGet(block.textures[1]);
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[18], vec2(uvs.x, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[19], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[20], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[21], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[22], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[23], vec2(uvs.z, uvs.w), 0.5),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[18], vec2(uvs.x, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[19], vec2(uvs.z, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[20], vec2(uvs.x, uvs.w), 0.5),
@@ -213,7 +291,15 @@ private static:
                     // Front cap
                     if (blockFreeFront) {
                         vec4 uvs = fcAtlasGet(block.textures[0]);
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[12], vec2(uvs.x, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[13], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[14], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[15], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[16], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[17], vec2(uvs.z, uvs.w), 0.5),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[12], vec2(uvs.x, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[13], vec2(uvs.x, uvs.w), 0.5),
                             CMData(cpos+voxelVerts[14], vec2(uvs.z, uvs.y), 0.5),
@@ -227,7 +313,15 @@ private static:
                     // Right cap
                     if (blockFreeRight) {
                         vec4 uvs = fcAtlasGet(block.textures[5]);
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[24], vec2(uvs.x, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[25], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[26], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[27], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[28], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[29], vec2(uvs.z, uvs.w), 0.5),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[24], vec2(uvs.x, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[25], vec2(uvs.z, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[26], vec2(uvs.x, uvs.w), 0.5),
@@ -241,7 +335,15 @@ private static:
                     // Left cap
                     if (blockFreeLeft) {
                         vec4 uvs = fcAtlasGet(block.textures[4]);
-                        bufferToWrite ~= ([
+                        if (blockTr) tbufferToWrite ~= ([
+                            CMData(cpos+voxelVerts[30], vec2(uvs.x, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[31], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[32], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[33], vec2(uvs.z, uvs.y), 0.5),
+                            CMData(cpos+voxelVerts[34], vec2(uvs.x, uvs.w), 0.5),
+                            CMData(cpos+voxelVerts[35], vec2(uvs.z, uvs.w), 0.5),
+                        ]);
+                        else bufferToWrite ~= ([
                             CMData(cpos+voxelVerts[30], vec2(uvs.x, uvs.y), 0.5),
                             CMData(cpos+voxelVerts[31], vec2(uvs.x, uvs.w), 0.5),
                             CMData(cpos+voxelVerts[32], vec2(uvs.z, uvs.y), 0.5),
@@ -253,7 +355,7 @@ private static:
                 }
             }
         }
-        return bufferToWrite;
+        return [bufferToWrite, tbufferToWrite];
     }
 
     __gshared bool shouldRun;
@@ -282,12 +384,15 @@ private static:
                         if (!atomicLoad(shouldRun)) continue;
                         // Generate a mesh for the task
 
+                        auto mesh = generateMesh(ctask.data);
                         // Send it back to our main thread so that it can be sent on to OpenGL
                         send(
                             owner, 
                             cast(immutable(MeshGenResponse)*)new MeshGenResponse(
                                 ctask.buffer, 
-                                cast(immutable(CMData[]))generateMesh(ctask.data)
+                                ctask.trbuffer, 
+                                cast(immutable(CMData[]))mesh[0],
+                                cast(immutable(CMData[]))mesh[1]
                             )
                         );
                     }
@@ -326,6 +431,7 @@ public static:
             if (response.buffer is null) return;
 
             (cast(ChunkVertexBuffer)*response.buffer).upload(response.data);
+            (cast(ChunkVertexBuffer)*response.trbuffer).upload(response.trdata);
         })) counter++;
     }
 

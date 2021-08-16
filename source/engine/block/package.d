@@ -33,21 +33,34 @@ package(engine):
     */
     BlockRef id;
 
+    /**
+        Whether the block is transparent and should be rendered differently
+    */
+    bool isTransparent_;
+
 protected:
 
     /**
         Collission for the block
     */
     AABB[] collission;
+
+    /**
+        Constructor
+    */
+    this() {
+        this.collission = [AABB(vec3(0, 0, 0), vec3(1, 1, 1))];
+    }
     
     /**
         Sets texture for all faces of the block
     */
-    void setTexture(string texture) {
+    final void setTexture(string texture) {
         fcAtlasAddTexture(texture);
         static foreach(i; 0..6) {
             textures[i] = texture;
         }
+        isTransparent_ = fcAtlasGetTexTransparent(texture);
     }
 
     /**
@@ -59,66 +72,71 @@ protected:
         4 - Left
         5 - Right
     */
-    void setTexturesSides(string[6] textureList) {
+    final void setTexturesSides(string[6] textureList) {
         static foreach(i; 0..6) {
             fcAtlasAddTexture(textureList[i]);
             textures[i] = textureList[i];
+            
+            if (fcAtlasGetTexTransparent(textureList[i])) isTransparent_ = true;
         }
     }
 
     /**
         Sets the name of the block
     */
-    void setName(string name) {
+    final void setName(string name) {
         this.name = name;
     }
 
     /**
         Sets the default human-readable display name
     */
-    void setDisplayName(string name) {
+    final void setDisplayName(string name) {
         this.displayName = name;
     }
 
-    this() {
-        this.collission = [AABB(vec3(0, 0, 0), vec3(1, 1, 1))];
+    /**
+        Sets the block's collission
+    */
+    final void setCollission(AABB[] collission) {
+        this.collission = collission;
     }
 
 public:
 
     /**
-        Sets the block's collission
-    */
-    void setCollission(AABB[] collission) {
-        this.collission = collission;
-    }
-
-    /**
         Gets the name of the block
     */
-    string getName() {
+    final string getName() {
         return this.name;
     }
 
     /**
         Gets the human-readable display name of the block
     */
-    string getDisplayName() {
+    final string getDisplayName() {
         return this.displayName;
     }
 
     /**
         Gets the collission for the block
     */
-    AABB[] getCollission() {
+    final AABB[] getCollission() {
         return collission;
     }
 
     /**
         Gets the ID of the block
     */
-    BlockRef getId() {
+    final BlockRef getId() {
         return this.id;
+    }
+
+    /**
+        Gets whether the block is transparent
+    */
+    final bool isTransparent() {
+        return isTransparent_;
     }
 }
 

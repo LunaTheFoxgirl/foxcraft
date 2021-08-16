@@ -19,6 +19,7 @@ private {
     TexturePacker packer;
     Texture atlasTexture;
     __gshared vec4[string] uvStore;
+    __gshared bool[string] trStore;
     __gshared Mutex uvStoreMutex;
 }
 
@@ -50,7 +51,15 @@ void fcAtlasAddTexture(string name) {
         cast(float)(uvPixels.x+uvPixels.z)/ATLAS_RESOLUTION,
         cast(float)(uvPixels.y+uvPixels.w)/ATLAS_RESOLUTION
     );
+    trStore[name] = tex.isTransparent;
     uvStoreMutex.unlock();
+}
+
+/**
+    Gets whether a subtexture is transparent
+*/
+bool fcAtlasGetTexTransparent(string name) {
+    return trStore[name];
 }
 
 /**

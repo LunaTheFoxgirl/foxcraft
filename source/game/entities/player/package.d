@@ -119,6 +119,10 @@ public:
                 placeId = 2;
             }
 
+            if (kstate.isKeyDown(Keys.Four) && lstate.isKeyUp(Keys.Four)) {
+                placeId = 3;
+            }
+
             if (kstate.isKeyDown(Keys.Escape) && lstate.isKeyUp(Keys.Escape)) {
                 fcGameSetRelativeMouse(!fcGameGetRelativeMouse);
             }
