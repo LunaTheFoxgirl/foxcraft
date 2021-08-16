@@ -88,6 +88,21 @@ struct WorldPos {
             y >= origin.y-area && y < origin.y+area &&
             z >= origin.z-area && z < origin.z+area;
     }
+
+    ChunkPos toChunkPos() {
+        return ChunkPos(
+            cast(int)floor(cast(float)x/ChunkSize),
+            cast(int)floor(cast(float)z/ChunkSize)
+        );
+    }
+
+    WorldPos wrapped() {
+        return WorldPos(
+            (x < 0 ? ChunkSize-(x*-1)%ChunkSize : x)%ChunkSize,
+            clamp(y, 0, ChunkHeight-1),
+            (z < 0 ? ChunkSize-(z*-1)%ChunkSize : z)%ChunkSize,
+        );
+    }
 }
 
 /**
@@ -189,19 +204,12 @@ public:
         Gets the block at the specified position
     */
     Block getBlockAt(WorldPos position) {
-        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = position.toChunkPos();
 
         // Early return, no chunk found
         if (chunkPos !in chunks) return null;
 
-        WorldPos blockPos;
-        if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
-        else blockPos.x = position.x&ChunkSize-1;
-        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
-        if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
-        else blockPos.z = position.z&ChunkSize-1;
-
-        import std.stdio : writeln;
+        WorldPos blockPos = position.wrapped();
 
         // Return block
         return fcGetBlock(chunks[chunkPos].store.blocks[blockPos.x][blockPos.y][blockPos.z]);
@@ -211,19 +219,12 @@ public:
         Gets the block at the specified position
     */
     void setBlockAt(WorldPos position, BlockRef block) {
-        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = position.toChunkPos();
 
         // Early return, no chunk found
         if (chunkPos !in chunks) return;
 
-        WorldPos blockPos;
-        if (position.x < 0) blockPos.x = abs(position.x)%ChunkSize-1;
-        else blockPos.x = position.x&ChunkSize-1;
-        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
-        if (position.z < 0) blockPos.z = abs(position.z)%ChunkSize-1;
-        else blockPos.z = position.z&ChunkSize-1;
-
-        import std.stdio : writeln;
+        WorldPos blockPos = position.wrapped();
 
         // Return block
         chunks[chunkPos].setBlockAt(blockPos, block);
@@ -233,7 +234,7 @@ public:
         Gets the chunk at the specified position
     */
     Chunk getChunkAtWorldPos(WorldPos position) {
-        ChunkPos chunkPos = ChunkPos(position.x/ChunkSize, position.z/ChunkSize);
+        ChunkPos chunkPos = position.toChunkPos();
         return chunkPos in chunks ? chunks[chunkPos] : null;
     }
 
@@ -241,7 +242,6 @@ public:
         Gets the chunk at the specified position
     */
     Chunk getChunkAt(ChunkPos position) {
-        ChunkPos chunkPos = ChunkPos(position.x, position.z);
-        return chunkPos in chunks ? chunks[chunkPos] : null;
+        return position in chunks ? chunks[position] : null;
     }
 }

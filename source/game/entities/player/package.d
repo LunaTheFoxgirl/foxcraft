@@ -80,6 +80,8 @@ public:
         this.updateBlockLookAt();
         if (lookingAt) fcDrawBlockSelection(*lookingAt);
 
+        fcDrawChunkBorder(chunkPosition);
+
         if (lstate !is null) {
 
             if (kstate.isKeyDown(Keys.R) && lstate.isKeyUp(Keys.R)) {

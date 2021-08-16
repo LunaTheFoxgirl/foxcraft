@@ -60,31 +60,33 @@ private static:
 
     ChunkPos[] scanForEmpty(ChunkPos origin) {
         ChunkPos[] toLoad;
-        bool[VIEW_DISTANCE][VIEW_DISTANCE] checked;
         
-        void scanEmptyChunks(ChunkPos pos) {
-            ChunkPos position = ChunkPos(origin.x+(pos.x-VIEW_DISTANCE_HALF), origin.z+(pos.z-VIEW_DISTANCE_HALF));
+        void check(int x, int z) {
+            ChunkPos position = ChunkPos(origin.x+x, origin.z+z);
             if (position !in TheWorld.chunks) toLoad ~= position;
-            checked[pos.x][pos.z] = true;
-            
-            ChunkPos left = ChunkPos(pos.x-1, pos.z);
-            ChunkPos right = ChunkPos(pos.x+1, pos.z);
-            ChunkPos up = ChunkPos(pos.x, pos.z-1);
-            ChunkPos down = ChunkPos(pos.x, pos.z+1);
-            if (pos.x > 0 && !checked[pos.x-1][pos.z]) scanEmptyChunks(left);
-            if (pos.x < VIEW_DISTANCE-1 && !checked[pos.x+1][pos.z]) scanEmptyChunks(right);
-            if (pos.z > 0 && !checked[pos.x][pos.z-1]) scanEmptyChunks(up);
-            if (pos.z < VIEW_DISTANCE-1 && !checked[pos.x][pos.z+1]) scanEmptyChunks(down);
         }
 
-        // foreach(x; 0..VIEW_DISTANCE) {
-        //     foreach(z; 0..VIEW_DISTANCE) {
-        //         ChunkPos position = ChunkPos(origin.x+(x-VIEW_DISTANCE_HALF), origin.z+(z-VIEW_DISTANCE_HALF));
-        //         if (position !in TheWorld.chunks) toLoad ~= position;
-        //     }
-        // }
+        foreach(d; 0..VIEW_DISTANCE_HALF) {
+            if (d == 0) check(0, 0);
+            else {
+                int sideSizeLen = 3+(2*(d-1));
+                int topSizeLen = sideSizeLen-2;
 
-        scanEmptyChunks(ChunkPos(VIEW_DISTANCE_HALF, VIEW_DISTANCE_HALF));
+                foreach(x; 0..sideSizeLen) {
+                    int offset = x-(sideSizeLen/2);
+                    check(offset, d); 
+                    check(offset, -d); 
+                }
+
+                foreach(z; 0..topSizeLen) {
+                    int offset = z-(topSizeLen/2);
+                    check(d, offset); 
+                    check(-d, offset); 
+                }
+            }
+
+        }
+
         return toLoad;
     }
 
@@ -102,9 +104,8 @@ private static:
             }
         }
 
-        enum MAX_CHUNKS_PROCESS = 1000;
         int i;
-        for(;i < empty.length && i < MAX_CHUNKS_PROCESS; i++) {
+        for(;i < empty.length; i++) {
             Chunk chunk = new Chunk(TheWorld, empty[i]);
             chunk.setChunkBlocks(generateChunk(empty[i]));
             TheWorld.addChunk(chunk);
@@ -128,10 +129,18 @@ public static:
         terrainGeneratorFiber = new Fiber(() { threadGeneratorFunc(); });
     }
 
-    BlockRef[ChunkSize][ChunkHeight][ChunkSize] generateChunk(immutable(ChunkPos) cpos) {
-        BlockRef[ChunkSize][ChunkHeight][ChunkSize] blocks;
+    /**
+        Generates a chunk
+    */
+    ChunkBlockStore* generateChunk(immutable(ChunkPos) cpos) {
+        ChunkBlockStore* storage = new ChunkBlockStore;
         foreach(x; 0..ChunkSize) {
             foreach(z; 0..ChunkSize) {
+                double ELEVATION = osimplex.noise2(
+                    cast(double)(1000+(cpos.x*ChunkSize)+x)*0.001, 
+                    cast(double)(1000+(cpos.z*ChunkSize)+z)*0.001
+                )*64;
+
                 double noise1 = osimplex.noise2(
                     cast(double)(1000+(cpos.x*ChunkSize)+x)*0.001, 
                     cast(double)(1000+(cpos.z*ChunkSize)+z)*0.001
@@ -143,15 +152,16 @@ public static:
 
                 int height = cast(int)(
                     (256-16)+(((noise2*noise1)/2)*16)
+                    +ELEVATION
                 );
 
                 foreach(y; 0..ChunkHeight) {
-                    if (y == height) blocks[x][y][z] = 2;
-                    else if (y < height) blocks[x][y][z] = 1;
+                    if (y == height) storage.blocks[x][y][z] = 2;
+                    else if (y < height) storage.blocks[x][y][z] = 1;
                 }
             }
         }
-        return blocks;
+        return storage;
     }
 
     /**

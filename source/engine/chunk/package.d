@@ -4,6 +4,7 @@ import engine.render;
 import engine.chunk.mesh;
 
 public import engine.chunk.chunkprovider;
+public import engine.chunk.chunkdbg;
 
 /**
     The size of a chunk
@@ -112,7 +113,9 @@ package(engine):
 public:
 
     ~this() {
-        destroy!false(mesh);
+
+        // NOTE: Chunk could be destroyed during generation.
+        // destroy!false(mesh);
         destroy!false(store);
     }
 
@@ -142,8 +145,7 @@ public:
         this.world = world;
         this.position = position;
         this.mesh = new ChunkMesh(this);
-        BlockRef[ChunkSize][ChunkHeight][ChunkSize] chunkData;
-        store = new ChunkBlockStore(chunkData);
+        store = new ChunkBlockStore;
     }
 
 
@@ -159,6 +161,13 @@ public:
     */
     void setChunkBlocks(BlockRef[ChunkSize][ChunkHeight][ChunkSize] blocks) {
         this._storeUpdate(new ChunkBlockStore(blocks));
+    }
+
+    /**
+        Loads blocks
+    */
+    void setChunkBlocks(ChunkBlockStore* store) {
+        this._storeUpdate(cast(immutable(ChunkBlockStore)*)store);
     }
 
     /**
@@ -218,11 +227,7 @@ public:
         Gets whether there's a block at the specified location
     */
     bool hasBlockAt(WorldPos blockPos) {
-        if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
-        else blockPos.x = blockPos.x%ChunkSize;
-        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
-        if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
-        else blockPos.z = blockPos.z%ChunkSize;
+        blockPos = blockPos.wrapped();
         return this.store.blocks[blockPos.x][blockPos.y][blockPos.z] > 0;
     }
 
@@ -230,11 +235,7 @@ public:
         Sets block in chunk
     */
     void setBlockAt(WorldPos blockPos, BlockRef block) {
-        if (blockPos.x <= 0) blockPos.x = (ChunkSize-1)-(abs(blockPos.x)%ChunkSize);
-        else blockPos.x = blockPos.x%ChunkSize;
-        blockPos.y = clamp(blockPos.y, 0, ChunkHeight-1);
-        if (blockPos.z <= 0) blockPos.z = (ChunkSize-1)-(abs(blockPos.z)%ChunkSize);
-        else blockPos.z = blockPos.z%ChunkSize;
+        blockPos = blockPos.wrapped();
 
         auto store = *store;
         BlockRef[ChunkSize][ChunkHeight][ChunkSize] oldBlockList = store.blocks.dup;

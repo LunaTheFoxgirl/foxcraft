@@ -16,12 +16,12 @@ public:
     vec3 position = vec3(0, 256, 0);
 
     /**
-        Position of chunk the entitiy is in
+        Position of chunk the entity is in
     */
     ChunkPos chunkPosition() {
         return ChunkPos(
-            cast(int)(TheWorld.player.worldPosition.x/ChunkSize),
-            cast(int)(TheWorld.player.worldPosition.z/ChunkSize)
+            cast(int)floor(TheWorld.player.worldPosition.x/ChunkSize),
+            cast(int)floor(TheWorld.player.worldPosition.z/ChunkSize)
         );
     }
 

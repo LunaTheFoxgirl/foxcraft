@@ -41,6 +41,7 @@ void fcInitEngine() {
     fcInitAtlas();
     fcInitChunkMeshRender();
     fcInitBlockSelect();
+    fcInitChunkDbg();
 
     // Initialize game resources
     fcInitBlocks();
