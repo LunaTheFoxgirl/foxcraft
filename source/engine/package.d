@@ -22,6 +22,8 @@ private {
     long nowFrameTime = 0;
     double deltaTime = 0;
 
+    ubyte memFreeCounter = 0;
+
     vec2i viewport;
 }
 
@@ -132,6 +134,9 @@ void fcStartEngine() {
 
         // Apparently the GC doesn't collect itself
         GC.collect();
+
+        // After 255 frames, minimize the heap freeing memory for the OS
+        if (memFreeCounter++ == 255) GC.minimize();
     }
 
     MeshGenerator.stop();
